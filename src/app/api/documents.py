@@ -5,7 +5,11 @@ from app.ingestion.loader import load_document
 from app.ingestion.splitter import split_document
 from app.vectorization.vector_store import get_vector_store
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    responses={404: {"description": "Not found"}}
+)
 
 @router.post("/upload", summary="Faz upload e cria novo documento na coleção")
 async def create_document(

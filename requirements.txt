@@ -1,0 +1,20 @@
+# Core framework
+fastapi>=0.115.12
+uvicorn[standard]>=0.34.2
+
+# LangChain & embeddings
+langchain>=0.3.25
+openai>=1.82.1
+
+# Database & vector store
+SQLAlchemy>=2.0.41
+pgvector>=0.4.1
+psycopg[binary]>=3.2.9
+
+# Configuration
+python-dotenv>=1.1.0
+
+# Testing
+pytest>=8.3.5
+pytest-mock>=3.14.1
+pytest-asyncio>=1.0.0
