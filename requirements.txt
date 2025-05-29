@@ -10,6 +10,7 @@ openai>=1.82.1
 SQLAlchemy>=2.0.41
 pgvector>=0.4.1
 psycopg[binary]>=3.2.9
+psycopg2-binary>=2.9.10
 
 # Configuration
 python-dotenv>=1.1.0

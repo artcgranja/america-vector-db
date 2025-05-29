@@ -24,7 +24,7 @@ class DocumentEmendaCreate(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "num_emenda": 505,
                 "apresentada_por": "Deputado Fulano",

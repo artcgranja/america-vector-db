@@ -30,7 +30,7 @@ async def create_document(
         num_emenda=num_emenda,
         apresentada_por=apresentada_por,
         data_apresentacao=data_apresentacao,
-        metadata={
+        document_metadata={
             "num_emenda": num_emenda,
             "apresentada_por": apresentada_por,
             "data_apresentacao": data_apresentacao
