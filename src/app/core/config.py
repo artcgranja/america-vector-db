@@ -10,7 +10,7 @@ class Settings(BaseModel):
     database_url: str = os.getenv("DATABASE_URL")
     chunk_size: int = 1000
     chunk_overlap: int = 100
-    host: str = "0.0.0.0"
+    host: str = "localhost"
     port: int = 8000
 
     class Config:

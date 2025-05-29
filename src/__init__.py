@@ -1,3 +1,0 @@
-"""
-America Vector DB
-""" 

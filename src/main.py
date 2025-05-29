@@ -2,8 +2,9 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.app.api.documents import router as documents_router
-from src.app.core.config import settings
+from app.api import documents
+from app.core.config import settings
+from app.db.session import engine
 
 app = FastAPI(
     title="Vector Service",
@@ -22,7 +23,7 @@ app.add_middleware(
 )
 
 # Registrar rotas
-app.include_router(documents_router)
+app.include_router(documents.router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host=settings.host, port=settings.port, reload=True)
