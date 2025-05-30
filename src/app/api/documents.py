@@ -38,6 +38,72 @@ def prepare_chunks(chunks, document_id: int, metadata: dict):
         })
     return chunks
 
+@router.post("/upload_mpv", summary="Faz upload e cria nova MPV")
+async def create_mpv(
+    file: UploadFile = File(...),
+    numero: int = Form(...),
+    ano: int = Form(...),
+    ementa: str = Form(...),
+    data_publicacao: datetime = Form(...),
+    status: str = Form(...)
+):
+    logger.info(f"Iniciando processamento da MPV {numero}/{ano}")
+    
+    docs = await load_document(file)
+    
+    with get_db_session() as db:
+        try:
+            # Criar nome da coleção baseado no número e ano da MPV
+            collection_name = f"mpv_{numero}_{ano}"
+            
+            metadata = {
+                "numero": numero,
+                "ano": ano,
+                "data_publicacao": data_publicacao.isoformat() if isinstance(data_publicacao, datetime) else str(data_publicacao),
+            }
+            
+            document = MPVModel(
+                filename=file.filename,
+                collection_name=collection_name,
+                numero=numero,
+                ano=ano,
+                ementa=ementa,
+                data_publicacao=data_publicacao,
+                document_metadata=metadata,
+                status=status
+            )
+            
+            db.add(document)
+            db.flush()
+
+            chunks = split_document(docs)
+            
+            if not chunks:
+                raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do documento")
+            
+            prepare_chunks(chunks, document.id, metadata)
+            vs = get_vector_store(collection_name)
+            vs.add_documents(chunks)
+            
+            document.chunks_count = len(chunks)
+            
+            db.commit()
+            
+            logger.info(f"MPV {numero}/{ano} processada: {len(chunks)} chunks")
+            
+            return {
+                "mpv": f"{numero}/{ano}",
+                "document_id": document.id,
+                "message": f"{len(chunks)} chunks indexados na coleção '{collection_name}'"
+            }
+            
+        except Exception as e:
+            if 'document' in locals() and hasattr(document, 'id') and document.id:
+                cleanup_vector_store(collection_name, document.id)
+            
+            logger.error(f"Erro ao processar MPV {numero}/{ano}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erro ao processar documento: {str(e)}")
+
 @router.post("/upload_emenda", summary="Faz upload e cria novo documento na coleção")
 async def create_document(
     file: UploadFile = File(...),
