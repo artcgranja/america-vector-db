@@ -4,7 +4,7 @@ from langchain_postgres.vectorstores import PGVector
 from app.core.config import settings
 
 def get_vector_store(collection_name: str):
-    embeddings = OpenAIEmbeddings(openai_api_key=settings.openai_api_key)
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
     return PGVector(
         embeddings=embeddings,
         connection=settings.database_url,
