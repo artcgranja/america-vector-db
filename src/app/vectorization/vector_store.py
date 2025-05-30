@@ -9,6 +9,6 @@ def get_vector_store(collection_name: str):
         embeddings=embeddings,
         connection=settings.database_url,
         collection_name=collection_name,
-        distance_strategy="COSINE",
+        distance_strategy="cosine",
         use_jsonb=True
     )

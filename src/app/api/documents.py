@@ -1,15 +1,13 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Form
 from typing import List, Optional
 from contextlib import contextmanager
-from app.db.models.documents import DocumentEmendaModel
+from app.db.models.documents import DocumentEmendaModel, MPVModel
 from app.schemas.documents import DocumentEmendaCreate
 from app.ingestion.loader import load_document
 from app.ingestion.splitter import split_document
 from app.vectorization.vector_store import get_vector_store
 from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from app.db.session import SessionLocal
+from app.db.session import get_db_session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,18 +17,6 @@ router = APIRouter(
     tags=["documents"],
     responses={404: {"description": "Not found"}}
 )
-
-# Context manager para gerenciar transações
-@contextmanager
-def get_db_session():
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
 
 # Helper para cleanup do vector store
 def cleanup_vector_store(collection_name: str, doc_id: int):
@@ -58,47 +44,50 @@ async def create_document(
     num_emenda: int = Form(...),
     apresentada_por: str = Form(...),
     data_apresentacao: datetime = Form(...),
-    collection_name: Optional[str] = Query(None, description="Nome da coleção de vetores")
+    mpv_id: int = Form(..., description="ID da MPV associada à emenda")
 ):
     logger.info(f"Iniciando processamento da emenda {num_emenda}")
     
-    # Processar arquivo primeiro (mais provável de falhar)
     docs = await load_document(file)
-    chunks = split_document(docs)
-    
-    if not chunks:
-        raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do documento")
-    
-    # Preparar metadados
-    metadata = {
-        "num_emenda": num_emenda,
-        "apresentada_por": apresentada_por,
-        "data_apresentacao": data_apresentacao.isoformat() if isinstance(data_apresentacao, datetime) else str(data_apresentacao)
-    }
     
     with get_db_session() as db:
         try:
-            # Criar documento
+            mpv = db.query(MPVModel).filter(MPVModel.id == mpv_id).first()
+            if not mpv:
+                raise HTTPException(status_code=404, detail=f"MPV com ID {mpv_id} não encontrada")
+            
+            metadata = {
+                "num_emenda": num_emenda,
+                "apresentada_por": apresentada_por,
+                "data_apresentacao": data_apresentacao.isoformat() if isinstance(data_apresentacao, datetime) else str(data_apresentacao),
+                "mpv_numero": mpv.numero,
+                "mpv_ano": mpv.ano
+            }
+            
             document = DocumentEmendaModel(
                 filename=file.filename,
-                collection_name=collection_name,
+                collection_name=mpv.collection_name,
                 num_emenda=num_emenda,
                 apresentada_por=apresentada_por,
                 data_apresentacao=data_apresentacao,
-                document_metadata=metadata
+                document_metadata=metadata,
+                mpv_id=mpv_id
             )
             
             db.add(document)
-            db.flush()  # Gera ID
+            db.flush()
+
+            chunks = split_document(docs)
             
-            # Preparar e adicionar chunks
+            if not chunks:
+                raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do documento")
+            
             prepare_chunks(chunks, document.id, metadata)
-            vs = get_vector_store(collection_name)
+            vs = get_vector_store(mpv.collection_name)
             vs.add_documents(chunks)
             
-            # Finalizar documento
             document.chunks_count = len(chunks)
-            document.vector_store_name = collection_name or vs.collection_name
+            document.vector_store_name = mpv.collection_name
             
             db.commit()
             
@@ -107,96 +96,46 @@ async def create_document(
             return {
                 "emenda": num_emenda,
                 "document_id": document.id,
-                "message": f"{len(chunks)} chunks indexados na coleção '{document.vector_store_name}'"
+                "mpv": f"{mpv.numero}/{mpv.ano}",
+                "message": f"{len(chunks)} chunks indexados na coleção '{mpv.collection_name}'"
             }
             
         except Exception as e:
-            # Cleanup automático do vector store se necessário
             if 'document' in locals() and hasattr(document, 'id') and document.id:
-                cleanup_vector_store(collection_name, document.id)
+                cleanup_vector_store(mpv.collection_name, document.id)
             
             logger.error(f"Erro ao processar emenda {num_emenda}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erro ao processar documento: {str(e)}")
 
 @router.get("/", summary="Lista todos os documentos na coleção")
-def list_documents(collection_name: Optional[str] = Query(None)):
-    try:
-        vs = get_vector_store(collection_name)
-        all_chunks = vs.get_all_documents()
-        doc_ids = list({chunk.metadata.get('doc_id') for chunk in all_chunks if 'doc_id' in chunk.metadata})
-        return {"documents": doc_ids}
-    except Exception as e:
-        logger.error(f"Erro ao listar documentos: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erro ao listar documentos")
+def list_documents():
+    with get_db_session() as db:
+        documents = db.query(MPVModel).all()
+        return documents
 
 @router.get("/{doc_id}", summary="Recupera chunks de um documento específico")
-def get_document(doc_id: str, collection_name: Optional[str] = Query(None)):
+def get_document(doc_id: int):
     try:
-        vs = get_vector_store(collection_name)
-        all_chunks = vs.get_all_documents()
-        chunks = [chunk.page_content for chunk in all_chunks if chunk.metadata.get('doc_id') == doc_id]
-        
-        if not chunks:
-            raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
-            
-        return {"doc_id": doc_id, "chunks": chunks}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erro ao recuperar documento {doc_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erro ao recuperar documento")
-
-@router.put("/{doc_id}", summary="Atualiza um documento existente")
-async def update_document(
-    doc_id: str,
-    file: UploadFile = File(...),
-    collection_name: Optional[str] = Query(None)
-):
-    # Processar arquivo primeiro
-    docs = await load_document(file)
-    chunks = split_document(docs)
-    
-    if not chunks:
-        raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do novo documento")
-    
-    with get_db_session() as db:
-        try:
-            # Verificar existência
+        with get_db_session() as db:
             document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == int(doc_id)).first()
             if not document:
                 raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
             
-            vs = get_vector_store(collection_name)
-            
-            # Remover chunks antigos e adicionar novos
-            vs.delete(filter={"doc_id": doc_id})
-            
-            metadata = {
-                "num_emenda": document.num_emenda,
-                "apresentada_por": document.apresentada_por,
-                "data_apresentacao": document.data_apresentacao.isoformat()
-            }
-            
-            prepare_chunks(chunks, int(doc_id), metadata)
-            vs.add_documents(chunks)
-            
-            # Atualizar documento
-            document.filename = file.filename
-            document.chunks_count = len(chunks)
-            document.updated_at = datetime.now()
-            
-            db.commit()
-            
-            return {"doc_id": doc_id, "message": f"Documento atualizado com {len(chunks)} chunks"}
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Erro ao atualizar documento {doc_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail="Erro ao atualizar documento")
+            return document
+    except HTTPException:
+        raise
+
+@router.put("/{doc_id}", summary="Atualiza um documento existente")
+async def update_document(doc_id: int):
+    with get_db_session() as db:
+        document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == int(doc_id)).first()
+        if not document:
+            raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
+        
+        return document
 
 @router.delete("/{doc_id}", summary="Remove um documento da coleção")
-def delete_document(doc_id: str, collection_name: Optional[str] = Query(None)):
+def delete_document(doc_id: int):
     with get_db_session() as db:
         try:
             # Verificar existência
@@ -205,7 +144,7 @@ def delete_document(doc_id: str, collection_name: Optional[str] = Query(None)):
                 raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
             
             # Remover do vector store e banco
-            vs = get_vector_store(collection_name)
+            vs = get_vector_store(document.collection_name)
             deleted_chunks = vs.delete(filter={"doc_id": doc_id})
             
             db.delete(document)

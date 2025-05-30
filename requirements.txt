@@ -1,13 +1,21 @@
 # Core framework
 fastapi>=0.115.12
 uvicorn[standard]>=0.34.2
+python-multipart==0.0.20
 
 # LangChain & embeddings
 langchain>=0.3.25
+langchain-community==0.3.24
+langchain-openai==0.3.18
+langchain-postgres==0.0.14
 openai>=1.82.1
+
+# Document processing
+pypdf==5.5.0
 
 # Database & vector store
 SQLAlchemy>=2.0.41
+alembic==1.16.1
 pgvector>=0.4.1
 psycopg[binary]>=3.2.9
 psycopg2-binary>=2.9.10
