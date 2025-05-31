@@ -1,13 +1,13 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Form
 from typing import List, Optional
 from contextlib import contextmanager
-from app.db.models.documents import DocumentEmendaModel, MPVModel
-from app.schemas.documents import DocumentEmendaCreate
-from app.ingestion.loader import load_document
-from app.ingestion.splitter import split_document
-from app.vectorization.vector_store import get_vector_store
+from src.app.db.models.documents import DocumentEmendaModel, MPVModel
+from src.app.schemas.documents import DocumentEmendaCreate
+from src.app.ingestion.loader import load_document
+from src.app.ingestion.splitter import split_document
+from src.app.vectorization.vector_store import get_vector_store
 from datetime import datetime
-from app.db.session import get_db_session
+from src.app.db.session import get_db_session
 import logging
 
 logger = logging.getLogger(__name__)

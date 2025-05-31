@@ -1,7 +1,7 @@
 from typing import List
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from app.core.config import settings
+from src.app.core.config import settings
 
 def split_document(documents: List[Document]) -> List[Document]:
     """

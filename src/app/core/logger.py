@@ -1,6 +1,6 @@
 import logging
 from logging import Logger
-from app.core.config import settings
+from src.app.core.config import settings
 
 # Define o nível de log a partir das configurações (padrão INFO)
 LOG_LEVEL = getattr(logging, getattr(settings, 'log_level', 'INFO').upper(), logging.INFO)
@@ -23,5 +23,5 @@ logging.getLogger('uvicorn.access').handlers = logging.root.handlers
 logging.getLogger('uvicorn.error').handlers = logging.root.handlers
 
 # Exemplo de uso:
-# from app.core.logger import logger
+# from src.app.core.logger import logger
 # logger.info('Aplicação iniciada com sucesso')
