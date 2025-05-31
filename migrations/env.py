@@ -1,4 +1,11 @@
 from logging.config import fileConfig
+import os
+import sys
+from pathlib import Path
+
+# Adicionando o diretório src ao PYTHONPATH
+SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+sys.path.append(str(SRC_DIR))
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool

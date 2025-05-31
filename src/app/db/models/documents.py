@@ -10,7 +10,6 @@ class DocumentBaseModel(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
     collection_name = Column(String, nullable=False)
-    document_metadata = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -23,7 +22,6 @@ class MPVModel(DocumentBaseModel):
     numero = Column(Integer, nullable=False)
     ano = Column(Integer, nullable=False)
     data_publicacao = Column(DateTime(timezone=True), nullable=False)
-    ementa = Column(String, nullable=False)
     status = Column(String, nullable=False)  # Em vigor, Revogada, etc.
     
     # Relacionamento com as emendas
@@ -38,6 +36,5 @@ class DocumentEmendaModel(DocumentBaseModel):
     chunks_count = Column(Integer, default=0)
     vector_store_name = Column(String, nullable=True)
     
-    # Chave estrangeira para a MPV
     mpv_id = Column(Integer, ForeignKey("mpvs.id"), nullable=False)
     mpv = relationship("MPVModel", back_populates="emendas")

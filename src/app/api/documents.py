@@ -47,8 +47,7 @@ async def create_mpv(
     data_publicacao: datetime = Form(...),
     status: str = Form(...)
 ):
-    logger.info(f"Iniciando processamento da MPV {numero}/{ano}")
-    
+  
     docs = await load_document(file)
     
     with get_db_session() as db:
@@ -56,20 +55,12 @@ async def create_mpv(
             # Criar nome da coleção baseado no número e ano da MPV
             collection_name = f"mpv_{numero}_{ano}"
             
-            metadata = {
-                "numero": numero,
-                "ano": ano,
-                "data_publicacao": data_publicacao.isoformat() if isinstance(data_publicacao, datetime) else str(data_publicacao),
-            }
-            
             document = MPVModel(
                 filename=file.filename,
                 collection_name=collection_name,
                 numero=numero,
                 ano=ano,
-                ementa=ementa,
                 data_publicacao=data_publicacao,
-                document_metadata=metadata,
                 status=status
             )
             
@@ -78,6 +69,11 @@ async def create_mpv(
 
             chunks = split_document(docs)
             
+            metadata = {
+                "doc_id": document.id,
+                "source": file.filename,
+            }
+
             if not chunks:
                 raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do documento")
             
@@ -99,6 +95,7 @@ async def create_mpv(
             
         except Exception as e:
             if 'document' in locals() and hasattr(document, 'id') and document.id:
+                db.rollback()
                 cleanup_vector_store(collection_name, document.id)
             
             logger.error(f"Erro ao processar MPV {numero}/{ano}: {str(e)}")
@@ -122,26 +119,23 @@ async def create_document(
             if not mpv:
                 raise HTTPException(status_code=404, detail=f"MPV com ID {mpv_id} não encontrada")
             
-            metadata = {
-                "num_emenda": num_emenda,
-                "apresentada_por": apresentada_por,
-                "data_apresentacao": data_apresentacao.isoformat() if isinstance(data_apresentacao, datetime) else str(data_apresentacao),
-                "mpv_numero": mpv.numero,
-                "mpv_ano": mpv.ano
-            }
-            
             document = DocumentEmendaModel(
                 filename=file.filename,
                 collection_name=mpv.collection_name,
                 num_emenda=num_emenda,
                 apresentada_por=apresentada_por,
                 data_apresentacao=data_apresentacao,
-                document_metadata=metadata,
                 mpv_id=mpv_id
             )
             
             db.add(document)
             db.flush()
+
+            metadata = {
+                "doc_id": document.id,
+                "source": file.filename,
+                "num_emenda": num_emenda,
+            }
 
             chunks = split_document(docs)
             
@@ -168,6 +162,7 @@ async def create_document(
             
         except Exception as e:
             if 'document' in locals() and hasattr(document, 'id') and document.id:
+                db.rollback()
                 cleanup_vector_store(mpv.collection_name, document.id)
             
             logger.error(f"Erro ao processar emenda {num_emenda}: {str(e)}")
