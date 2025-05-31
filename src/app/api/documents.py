@@ -43,7 +43,6 @@ async def create_mpv(
     file: UploadFile = File(...),
     numero: int = Form(...),
     ano: int = Form(...),
-    ementa: str = Form(...),
     data_publicacao: datetime = Form(...),
     status: str = Form(...)
 ):
