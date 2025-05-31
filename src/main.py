@@ -26,4 +26,4 @@ app.add_middleware(
 app.include_router(documents.router)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run(app, host="localhost", port=8000)
