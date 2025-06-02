@@ -2,7 +2,13 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Form
 from typing import List, Optional
 from contextlib import contextmanager
 from src.app.db.models.documents import DocumentEmendaModel, MPVModel
-from src.app.schemas.documents import DocumentEmendaCreate
+from src.app.schemas.documents import (
+    DocumentEmendaListResponse, 
+    MPVResponse, 
+    MPVCreate,
+    DocumentEmendaResponse,
+    DocumentEmendaCreate
+)
 from src.app.ingestion.loader import load_document
 from src.app.ingestion.splitter import split_document
 from src.app.vectorization.vector_store import get_vector_store
@@ -100,7 +106,7 @@ async def create_mpv(
             logger.error(f"Erro ao processar MPV {numero}/{ano}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erro ao processar documento: {str(e)}")
 
-@router.post("/upload_emenda", summary="Faz upload e cria novo documento na coleção")
+@router.post("/upload_emenda", summary="Faz upload e cria nova emenda")
 async def create_document(
     file: UploadFile = File(...),
     num_emenda: int = Form(...),
@@ -173,48 +179,143 @@ def list_documents():
         documents = db.query(MPVModel).all()
         return documents
 
-@router.get("/{doc_id}", summary="Recupera chunks de um documento específico")
-def get_document(doc_id: int):
-    try:
-        with get_db_session() as db:
-            document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == int(doc_id)).first()
-            if not document:
-                raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
-            
-            return document
-    except HTTPException:
-        raise
-
-@router.put("/{doc_id}", summary="Atualiza um documento existente")
+@router.get("/{doc_id}", summary="Lista MPV e emendas")
 async def update_document(doc_id: int):
     with get_db_session() as db:
-        document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == int(doc_id)).first()
-        if not document:
+        mpv_document = db.query(MPVModel).filter(MPVModel.id == doc_id).first()
+        emenda_document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.mpv_id == doc_id).all()
+        if not mpv_document:
             raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
         
-        return document
+        mpv_response = MPVResponse.model_validate(mpv_document)
+        return DocumentEmendaListResponse(mpv_id=mpv_document.id, mpv=mpv_response, emendas=emenda_document)
 
-@router.delete("/{doc_id}", summary="Remove um documento da coleção")
+@router.put("/{doc_id}", summary="Atualiza MPV")
+async def update_document(doc_id: int, mpv_update: MPVCreate):
+    with get_db_session() as db:
+        mpv_document = db.query(MPVModel).filter(MPVModel.id == doc_id).first()
+        if not mpv_document:
+            raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
+        
+        # Update MPV fields
+        mpv_document.numero = mpv_update.numero
+        mpv_document.ano = mpv_update.ano
+        mpv_document.data_publicacao = mpv_update.data_publicacao
+        mpv_document.status = mpv_update.status
+        mpv_document.filename = mpv_update.filename
+        mpv_document.collection_name = mpv_update.collection_name
+        
+        try:
+            db.commit()
+            # Convert to response model
+            mpv_response = MPVResponse.model_validate(mpv_document)
+            return mpv_response
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Erro ao atualizar MPV {doc_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erro ao atualizar documento: {str(e)}")
+
+@router.delete("/{doc_id}", summary="Remove MPV e emendas")
 def delete_document(doc_id: int):
     with get_db_session() as db:
         try:
             # Verificar existência
-            document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == int(doc_id)).first()
-            if not document:
+            mpv_document = db.query(MPVModel).filter(MPVModel.id == doc_id).first()
+            emenda_document = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.mpv_id == doc_id).all()
+            if not mpv_document:
                 raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
             
             # Remover do vector store e banco
-            vs = get_vector_store(document.collection_name)
-            deleted_chunks = vs.delete(filter={"doc_id": doc_id})
+            collection_name = mpv_document.collection_name
+            vs = get_vector_store(collection_name)
             
-            db.delete(document)
+            # Delete all chunks from the vector store
+            deleted_chunks = vs.delete(filter={"doc_id": str(doc_id)})
+            
+            # Delete the collection itself
+            try:
+                vs.delete_collection()
+                logger.info(f"Coleção '{collection_name}' removida do vector store")
+            except Exception as e:
+                logger.error(f"Erro ao remover coleção '{collection_name}' do vector store: {str(e)}")
+            
+            # Delete from database
+            for emenda in emenda_document:
+                db.delete(emenda)
+            db.delete(mpv_document)
             db.commit()
             
             chunks_count = len(deleted_chunks) if deleted_chunks else 0
-            return {"doc_id": doc_id, "message": f"Documento removido, {chunks_count} chunks deletados"}
+            return {
+                "doc_id": doc_id,
+                "message": f"MPV e emendas removidos, {chunks_count} chunks deletados, coleção '{collection_name}' removida"
+            }
             
         except HTTPException:
             raise
         except Exception as e:
+            db.rollback()
             logger.error(f"Erro ao deletar documento {doc_id}: {str(e)}")
             raise HTTPException(status_code=500, detail="Erro ao deletar documento")
+
+@router.put("/emenda/{doc_id}", summary="Atualiza uma emenda existente")
+async def update_emenda(doc_id: int, emenda_update: DocumentEmendaCreate):
+    with get_db_session() as db:
+        try:
+            emenda = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == doc_id).first()
+            if not emenda:
+                raise HTTPException(status_code=404, detail=f"Emenda '{doc_id}' não encontrada")
+            
+            # Verificar se a MPV existe
+            mpv = db.query(MPVModel).filter(MPVModel.id == emenda_update.mpv_id).first()
+            if not mpv:
+                raise HTTPException(status_code=404, detail=f"MPV com ID {emenda_update.mpv_id} não encontrada")
+            
+            # Atualizar campos
+            emenda.num_emenda = emenda_update.num_emenda
+            emenda.apresentada_por = emenda_update.apresentada_por
+            emenda.data_apresentacao = emenda_update.data_apresentacao
+            emenda.mpv_id = emenda_update.mpv_id
+            emenda.filename = emenda_update.filename
+            emenda.collection_name = emenda_update.collection_name
+            
+            db.commit()
+            
+            return DocumentEmendaResponse.model_validate(emenda)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Erro ao atualizar emenda {doc_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erro ao atualizar emenda: {str(e)}")
+
+@router.delete("/emenda/{doc_id}", summary="Remove uma emenda")
+def delete_emenda(doc_id: int):
+    with get_db_session() as db:
+        try:
+            # Verificar existência
+            emenda = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.id == doc_id).first()
+            if not emenda:
+                raise HTTPException(status_code=404, detail=f"Emenda '{doc_id}' não encontrada")
+            
+            # Remover do vector store
+            vs = get_vector_store(emenda.collection_name)
+            deleted_chunks = vs.delete(filter={"doc_id": str(doc_id)})
+            
+            # Remover do banco
+            db.delete(emenda)
+            db.commit()
+            
+            chunks_count = len(deleted_chunks) if deleted_chunks else 0
+            return {
+                "doc_id": doc_id,
+                "message": f"Emenda removida, {chunks_count} chunks deletados"
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Erro ao deletar emenda {doc_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail="Erro ao deletar emenda")
