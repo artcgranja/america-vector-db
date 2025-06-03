@@ -1,81 +1,95 @@
-from typing import List, Dict
-from langchain.schema import Document
+import os
+import base64
+import tempfile
+from typing import List
+from markitdown import MarkItDown
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import re
+from langchain_postgres import PGVector
+from langchain_openai import OpenAIEmbeddings
+from langchain.schema import Document as LangchainDocument
 
-class LegalDocumentSplitter:
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
-        
-    def _extract_sections(self, text: str) -> List[Dict]:
-        # Regex patterns for legal document structure
-        patterns = {
-            "artigo": r"Art\.\s*\d+\.\s*[^\n]+",
-            "paragrafo": r"§\s*\d+\.\s*[^\n]+",
-            "inciso": r"[IVX]+\)\s*[^\n]+",
-            "alinea": r"[a-z]\)\s*[^\n]+"
-        }
-        
-        sections = []
-        for section_type, pattern in patterns.items():
-            matches = re.finditer(pattern, text)
-            for match in matches:
-                sections.append({
-                    "type": section_type,
-                    "content": match.group(),
-                    "start": match.start(),
-                    "end": match.end()
-                })
-        return sorted(sections, key=lambda x: x["start"])
+class DocumentProcessor:
+    """Processador de documentos para FastAPI"""
     
-    def split_document(self, documents: List[Document]) -> List[Document]:
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
+    def __init__(self, collection_name: str):
+        """Inicializa o processador de documentos"""
+        # Use a fixed 3072-dimensional embedder for high-dimensional vectors
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        self.collection_name = collection_name
+        test_vec = self.embeddings.embed_query("test")
+        if len(test_vec) != 3072:
+            raise ValueError(f"Expected 3072-dimension embeddings, but got {len(test_vec)}")
+        self.md_converter = MarkItDown(enable_plugins=True)
+        
+    def get_vectorstore(self, collection_name: str) -> PGVector:
+        """Conecta ao vectorstore PGVector via engine SQLAlchemy"""
+        return PGVector(
+            embeddings=self.embeddings,
+            connection=os.getenv("DATABASE_URL"),
+            collection_name=self.collection_name,
+            use_jsonb=True
+        )
+    
+    def process_document_text(self, markdown_text: str, doc_id: int, filename: str, document_type: str, parent_id: str = None) -> List[LangchainDocument]:
+        """Processa texto markdown e gera chunks do LangChain"""
+        langchain_doc = LangchainDocument(
+            page_content=markdown_text,
+            metadata={
+                "source": filename,
+                "doc_id": doc_id,
+                "filename": filename,
+                "document_type": document_type,
+                "parent_id": int(parent_id) if parent_id else None,
+                "hierarchy_level": 0 if parent_id is None else 1
+            }
         )
         
-        enhanced_documents = []
-        for doc in documents:
-            sections = self._extract_sections(doc.page_content)
-            
-            # Create chunks preserving section boundaries
-            chunks = []
-            current_chunk = ""
-            current_sections = []
-            
-            for section in sections:
-                if len(current_chunk) + len(section["content"]) > self.chunk_size:
-                    if current_chunk:
-                        chunks.append({
-                            "content": current_chunk,
-                            "sections": current_sections
-                        })
-                    current_chunk = section["content"]
-                    current_sections = [section["type"]]
-                else:
-                    current_chunk += "\n" + section["content"]
-                    current_sections.append(section["type"])
-            
-            if current_chunk:
-                chunks.append({
-                    "content": current_chunk,
-                    "sections": current_sections
-                })
-            
-            # Create enhanced documents with section metadata
-            for chunk in chunks:
-                enhanced_metadata = doc.metadata.copy()
-                enhanced_metadata.update({
-                    "section_types": chunk["sections"],
-                    "section_count": len(chunk["sections"])
-                })
-                enhanced_documents.append(
-                    Document(
-                        page_content=chunk["content"],
-                        metadata=enhanced_metadata
-                    )
-                )
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+            add_start_index=True
+        )
+        return splitter.split_documents([langchain_doc])
+    
+    def create_vector_db_from_text(self, chunks: List[LangchainDocument]) -> int:
+        """Cria ou atualiza o vector store com novos chunks, em lotes de 100"""
+        db = self.get_vectorstore()
+        batch_size = 250
+        total = 0
         
-        return enhanced_documents
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            db.add_documents(batch)
+            total += len(batch)
+        
+        return total
+    
+    def process_and_store_document(self, file_base64: str, doc_id: int, filename: str, document_type: str, parent_id: str = None) -> int:
+        """Processa e vetoriza um documento"""
+        try:
+            file_bytes = base64.b64decode(file_base64)
+            
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                temp_file.write(file_bytes)
+                temp_path = temp_file.name
+            
+            try:
+                result = self.md_converter.convert(temp_path)
+                markdown_text = result.text_content
+                
+                chunks = self.process_document_text(markdown_text, doc_id, filename, document_type, parent_id)
+                return self.create_vector_db_from_text(chunks)
+                
+            finally:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                    
+        except Exception as e:
+            print(f"Erro ao processar documento {doc_id}: {e}")
+            raise
+    
+    def delete_document_from_vector_db(self, doc_id: int) -> None:
+        """Remove um documento do banco de dados do vector store"""
+        vectorstore = self.get_vectorstore()
+        vectorstore.delete(filter={"metadata": {"doc_id": doc_id}})

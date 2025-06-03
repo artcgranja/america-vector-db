@@ -9,8 +9,7 @@ from src.app.schemas.documents import (
     DocumentEmendaResponse,
     DocumentEmendaCreate
 )
-from src.app.ingestion.loader import load_document
-from src.app.ingestion.splitter import split_document
+from src.app.ingestion.splitter import DocumentProcessor
 from src.app.vectorization.vector_store import get_vector_store
 from datetime import datetime
 from src.app.db.session import get_db_session
@@ -24,25 +23,10 @@ router = APIRouter(
     responses={404: {"description": "Not found"}}
 )
 
-# Helper para cleanup do vector store
-def cleanup_vector_store(collection_name: str, doc_id: int):
-    """Remove chunks do vector store em caso de erro"""
-    try:
-        vs = get_vector_store(collection_name)
-        vs.delete(filter={"doc_id": str(doc_id)})
-        logger.info(f"Chunks removidos do vector store para documento {doc_id}")
-    except Exception as e:
-        logger.error(f"Erro ao remover chunks do vector store: {str(e)}")
-
-# Helper para preparar chunks
-def prepare_chunks(chunks, document_id: int, metadata: dict):
-    """Adiciona metadados aos chunks"""
-    for chunk in chunks:
-        chunk.metadata.update({
-            'doc_id': document_id,
-            **metadata
-        })
-    return chunks
+async def create_document_processor(
+    collection_name: str
+):
+    return DocumentProcessor(collection_name=collection_name)
 
 @router.post("/upload_mpv", summary="Faz upload e cria nova MPV")
 async def create_mpv(
@@ -52,8 +36,6 @@ async def create_mpv(
     data_publicacao: datetime = Form(...),
     status: str = Form(...)
 ):
-  
-    docs = await load_document(file)
     
     with get_db_session() as db:
         try:
@@ -72,36 +54,19 @@ async def create_mpv(
             db.add(document)
             db.flush()
 
-            chunks = split_document(docs)
-            
-            metadata = {
-                "doc_id": document.id,
-                "source": file.filename,
-            }
-
-            if not chunks:
-                raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do documento")
-            
-            prepare_chunks(chunks, document.id, metadata)
-            vs = get_vector_store(collection_name)
-            vs.add_documents(chunks)
-            
-            document.chunks_count = len(chunks)
-            
-            db.commit()
-            
-            logger.info(f"MPV {numero}/{ano} processada: {len(chunks)} chunks")
+            splitter = await create_document_processor(collection_name)
+            processed_chunks = await splitter.process_and_store_document(file, document.id, file.filename, "MPV")
             
             return {
                 "mpv": f"{numero}/{ano}",
                 "document_id": document.id,
-                "message": f"{len(chunks)} chunks indexados na coleção '{collection_name}'"
+                "message": f"{processed_chunks} chunks indexados na coleção '{collection_name}'"
             }
             
         except Exception as e:
             if 'document' in locals() and hasattr(document, 'id') and document.id:
                 db.rollback()
-                cleanup_vector_store(collection_name, document.id)
+                splitter.delete_document_from_vector_db(document.id)
             
             logger.error(f"Erro ao processar MPV {numero}/{ano}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erro ao processar documento: {str(e)}")
@@ -115,8 +80,6 @@ async def create_document(
     mpv_id: int = Form(..., description="ID da MPV associada à emenda")
 ):
     logger.info(f"Iniciando processamento da emenda {num_emenda}")
-    
-    docs = await load_document(file)
     
     with get_db_session() as db:
         try:
@@ -135,40 +98,24 @@ async def create_document(
             
             db.add(document)
             db.flush()
-
-            metadata = {
-                "doc_id": document.id,
-                "source": file.filename,
-                "num_emenda": num_emenda,
-            }
-
-            chunks = split_document(docs)
-            
-            if not chunks:
-                raise HTTPException(status_code=400, detail="Nenhum chunk foi gerado do documento")
-            
-            prepare_chunks(chunks, document.id, metadata)
-            vs = get_vector_store(mpv.collection_name)
-            vs.add_documents(chunks)
-            
-            document.chunks_count = len(chunks)
-            document.vector_store_name = mpv.collection_name
+            splitter = await create_document_processor(mpv.collection_name)
+            processed_chunks = await splitter.process_and_store_document(file, document.id, file.filename, "EMENDA", mpv_id)
             
             db.commit()
             
-            logger.info(f"Emenda {num_emenda} processada: {len(chunks)} chunks")
+            logger.info(f"Emenda {num_emenda} processada: {processed_chunks} chunks")
             
             return {
                 "emenda": num_emenda,
                 "document_id": document.id,
                 "mpv": f"{mpv.numero}/{mpv.ano}",
-                "message": f"{len(chunks)} chunks indexados na coleção '{mpv.collection_name}'"
+                "message": f"{processed_chunks} chunks indexados na coleção '{mpv.collection_name}'"
             }
             
         except Exception as e:
             if 'document' in locals() and hasattr(document, 'id') and document.id:
                 db.rollback()
-                cleanup_vector_store(mpv.collection_name, document.id)
+                splitter.delete_document_from_vector_db(document.id)
             
             logger.error(f"Erro ao processar emenda {num_emenda}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erro ao processar documento: {str(e)}")
@@ -216,7 +163,7 @@ async def update_document(doc_id: int, mpv_update: MPVCreate):
             raise HTTPException(status_code=500, detail=f"Erro ao atualizar documento: {str(e)}")
 
 @router.delete("/{doc_id}", summary="Remove MPV e emendas")
-def delete_document(doc_id: int):
+async def delete_document(doc_id: int):
     with get_db_session() as db:
         try:
             # Verificar existência
@@ -225,22 +172,17 @@ def delete_document(doc_id: int):
             if not mpv_document:
                 raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
             
-            # Remover do vector store e banco
-            collection_name = mpv_document.collection_name
-            vs = get_vector_store(collection_name)
+            splitter = await create_document_processor(mpv_document.collection_name)
             
-            # Delete all chunks from the vector store
-            deleted_chunks = vs.delete(filter={"doc_id": str(doc_id)})
-            
-            # Delete the collection itself
             try:
-                vs.delete_collection()
-                logger.info(f"Coleção '{collection_name}' removida do vector store")
+                deleted_chunks = splitter.delete_document_from_vector_db(doc_id)
             except Exception as e:
                 logger.error(f"Erro ao remover coleção '{collection_name}' do vector store: {str(e)}")
             
             # Delete from database
             for emenda in emenda_document:
+                emenda_splitter = await create_document_processor(emenda.collection_name)
+                emenda_splitter.delete_document_from_vector_db(emenda.id)
                 db.delete(emenda)
             db.delete(mpv_document)
             db.commit()
@@ -291,7 +233,7 @@ async def update_emenda(doc_id: int, emenda_update: DocumentEmendaCreate):
             raise HTTPException(status_code=500, detail=f"Erro ao atualizar emenda: {str(e)}")
 
 @router.delete("/emenda/{doc_id}", summary="Remove uma emenda")
-def delete_emenda(doc_id: int):
+async def delete_emenda(doc_id: int):
     with get_db_session() as db:
         try:
             # Verificar existência
@@ -299,18 +241,15 @@ def delete_emenda(doc_id: int):
             if not emenda:
                 raise HTTPException(status_code=404, detail=f"Emenda '{doc_id}' não encontrada")
             
-            # Remover do vector store
-            vs = get_vector_store(emenda.collection_name)
-            deleted_chunks = vs.delete(filter={"doc_id": str(doc_id)})
+            splitter = await create_document_processor(emenda.collection_name)
+            splitter.delete_document_from_vector_db(emenda.id)
             
-            # Remover do banco
             db.delete(emenda)
             db.commit()
             
-            chunks_count = len(deleted_chunks) if deleted_chunks else 0
             return {
                 "doc_id": doc_id,
-                "message": f"Emenda removida, {chunks_count} chunks deletados"
+                "message": f"Emenda removida"
             }
             
         except HTTPException:
