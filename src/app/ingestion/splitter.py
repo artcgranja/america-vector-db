@@ -1,7 +1,8 @@
 import os
 import base64
 import tempfile
-from typing import List
+from typing import List, Union
+from fastapi import UploadFile
 from markitdown import MarkItDown
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_postgres import PGVector
@@ -64,6 +65,16 @@ class DocumentProcessor:
             total += len(batch)
         
         return total
+    
+    async def process_upload_file(self, file: UploadFile, doc_id: int, filename: str, document_type: str, parent_id: str = None) -> int:
+        """Processa e vetoriza um documento a partir de um UploadFile"""
+        try:
+            content = await file.read()
+            file_base64 = base64.b64encode(content).decode('utf-8')
+            return self.process_and_store_document(file_base64, doc_id, filename, document_type, parent_id)
+        except Exception as e:
+            print(f"Erro ao processar documento {doc_id}: {e}")
+            raise
     
     def process_and_store_document(self, file_base64: str, doc_id: int, filename: str, document_type: str, parent_id: str = None) -> int:
         """Processa e vetoriza um documento"""

@@ -10,7 +10,6 @@ from src.app.schemas.documents import (
     DocumentEmendaCreate
 )
 from src.app.ingestion.splitter import DocumentProcessor
-from src.app.vectorization.vector_store import get_vector_store
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging
@@ -55,7 +54,9 @@ async def create_mpv(
             db.flush()
 
             splitter = await create_document_processor(collection_name)
-            processed_chunks = await splitter.process_and_store_document(file, document.id, file.filename, "MPV")
+            processed_chunks = await splitter.process_upload_file(file, document.id, file.filename, "MPV")
+
+            db.commit()
             
             return {
                 "mpv": f"{numero}/{ano}",
@@ -99,7 +100,7 @@ async def create_document(
             db.add(document)
             db.flush()
             splitter = await create_document_processor(mpv.collection_name)
-            processed_chunks = await splitter.process_and_store_document(file, document.id, file.filename, "EMENDA", mpv_id)
+            processed_chunks = await splitter.process_upload_file(file, document.id, file.filename, "EMENDA", mpv_id)
             
             db.commit()
             
@@ -177,7 +178,7 @@ async def delete_document(doc_id: int):
             try:
                 deleted_chunks = splitter.delete_document_from_vector_db(doc_id)
             except Exception as e:
-                logger.error(f"Erro ao remover coleção '{collection_name}' do vector store: {str(e)}")
+                logger.error(f"Erro ao remover coleção '{mpv_document.collection_name}' do vector store: {str(e)}")
             
             # Delete from database
             for emenda in emenda_document:
@@ -190,7 +191,7 @@ async def delete_document(doc_id: int):
             chunks_count = len(deleted_chunks) if deleted_chunks else 0
             return {
                 "doc_id": doc_id,
-                "message": f"MPV e emendas removidos, {chunks_count} chunks deletados, coleção '{collection_name}' removida"
+                "message": f"MPV e emendas removidos, {chunks_count} chunks deletados, coleção '{mpv_document.collection_name}' removida"
             }
             
         except HTTPException:
