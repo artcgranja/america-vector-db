@@ -21,7 +21,7 @@ class DocumentProcessor:
             raise ValueError(f"Expected 3072-dimension embeddings, but got {len(test_vec)}")
         self.md_converter = MarkItDown(enable_plugins=True)
         
-    def get_vectorstore(self, collection_name: str) -> PGVector:
+    def get_vectorstore(self) -> PGVector:
         """Conecta ao vectorstore PGVector via engine SQLAlchemy"""
         return PGVector(
             embeddings=self.embeddings,
