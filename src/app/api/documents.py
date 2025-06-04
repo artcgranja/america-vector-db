@@ -10,6 +10,8 @@ from src.app.schemas.documents import (
     DocumentEmendaCreate
 )
 from src.app.ingestion.splitter import DocumentProcessor
+from src.app.ingestion.convertor import converter
+from src.service.classifier import classifier
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging
@@ -38,9 +40,11 @@ async def create_mpv(
     
     with get_db_session() as db:
         try:
-            # Criar nome da coleção baseado no número e ano da MPV
             collection_name = f"mpv_{numero}_{ano}"
-            
+
+            md_text = converter.convert_to_markdown(file.file, file.filename)
+            subjects = classifier.classify_markdown_file(md_text)
+
             document = MPVModel(
                 filename=file.filename,
                 collection_name=collection_name,
@@ -54,7 +58,13 @@ async def create_mpv(
             db.flush()
 
             splitter = await create_document_processor(collection_name)
-            processed_chunks = await splitter.process_upload_file(file, document.id, file.filename, "MPV")
+            processed_chunks = splitter.process_and_store_document(
+                md_text=md_text, 
+                doc_id=document.id, 
+                filename=file.filename, 
+                document_type="MPV", 
+                subjects=subjects
+            )
 
             db.commit()
             
@@ -88,6 +98,9 @@ async def create_document(
             if not mpv:
                 raise HTTPException(status_code=404, detail=f"MPV com ID {mpv_id} não encontrada")
             
+            md_text = converter.convert_to_markdown(file.file, file.filename)
+            subjects = classifier.classify_markdown_file(md_text)
+            
             document = DocumentEmendaModel(
                 filename=file.filename,
                 collection_name=mpv.collection_name,
@@ -100,7 +113,14 @@ async def create_document(
             db.add(document)
             db.flush()
             splitter = await create_document_processor(mpv.collection_name)
-            processed_chunks = await splitter.process_upload_file(file, document.id, file.filename, "EMENDA", mpv_id)
+            processed_chunks = splitter.process_and_store_document(
+                md_text=md_text, 
+                doc_id=document.id, 
+                filename=file.filename, 
+                document_type="EMENDA", 
+                parent_id=mpv_id,
+                subjects=subjects
+            )
             
             db.commit()
             
