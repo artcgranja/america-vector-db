@@ -1,12 +1,13 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from sqlalchemy.orm import Session
 from src.app.db.models.documents import DocumentEmendaModel, MPVModel
+from src.app.db.models.subjects import SubjectModel
 from src.app.schemas.documents import (
     DocumentEmendaListResponse, 
     MPVResponse, 
     MPVCreate,
     DocumentEmendaResponse,
-    DocumentEmendaCreate
+    DocumentEmendaCreate,
 )
 from src.app.ingestion.splitter import DocumentProcessor
 from src.app.ingestion.convertor import converter

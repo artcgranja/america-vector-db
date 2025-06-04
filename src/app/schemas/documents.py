@@ -2,8 +2,6 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from src.app.db.models.documents import DocumentEmendaModel, MPVModel
-
 # Base schema with common fields
 class DocumentBaseSchema(BaseModel):
     id: int = Field(..., description="ID do documento")
