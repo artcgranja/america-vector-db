@@ -11,7 +11,7 @@ from src.app.schemas.documents import (
 )
 from src.app.ingestion.splitter import DocumentProcessor
 from src.app.ingestion.convertor import converter
-from src.service.classifier import ClassifierModel
+from src.app.service.classifier import ClassifierModel
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging

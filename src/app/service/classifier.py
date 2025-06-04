@@ -6,7 +6,7 @@ from langchain_core.prompts import (
 )
 from langchain_core.output_parsers import PydanticOutputParser
 from src.app.schemas.classifier_schemas import ClassifierResponse
-from src.service.promt import SYSTEM_PROMPT
+from src.app.service.promt import SYSTEM_PROMPT
 from sqlalchemy.orm import Session
 from src.app.db.models.subjects import SubjectModel
 import json
