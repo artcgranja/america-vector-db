@@ -1,15 +1,9 @@
-import os
-import base64
-import tempfile
-from typing import List, Union
-from fastapi import UploadFile
-from markitdown import MarkItDown
+from typing import List
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document as LangchainDocument
 from src.app.core.config import settings
-from datetime import datetime
 
 class DocumentProcessor:
     """Processador de documentos para FastAPI"""
@@ -27,7 +21,7 @@ class DocumentProcessor:
         """Conecta ao vectorstore PGVector via engine SQLAlchemy"""
         return PGVector(
             embeddings=self.embeddings,
-            connection=settings.pgvector_url,
+            connection=settings.database_url,
             collection_name=self.collection_name,
             use_jsonb=True
         )
