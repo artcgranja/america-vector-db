@@ -9,6 +9,7 @@ class Settings(BaseModel):
     openai_api_key: str = os.getenv("OPENAI_API_KEY")
     google_api_key: str = os.getenv("GOOGLE_API_KEY")
     database_url: str = os.getenv("DATABASE_URL")
+    pgvector_url: str = os.getenv("PGVECTOR_URL")
     chunk_size: int = 1000
     chunk_overlap: int = 100
     host: str = "localhost"

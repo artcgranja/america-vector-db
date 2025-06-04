@@ -8,6 +8,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document as LangchainDocument
+from src.app.core.config import settings
 
 class DocumentProcessor:
     """Processador de documentos para FastAPI"""
@@ -24,7 +25,7 @@ class DocumentProcessor:
         """Conecta ao vectorstore PGVector via engine SQLAlchemy"""
         return PGVector(
             embeddings=self.embeddings,
-            connection=os.getenv("DATABASE_URL"),
+            connection=settings.pgvector_url,
             collection_name=self.collection_name,
             use_jsonb=True
         )
@@ -77,4 +78,9 @@ class DocumentProcessor:
     def delete_document_from_vector_db(self, doc_id: int) -> None:
         """Remove um documento do banco de dados do vector store"""
         vectorstore = self.get_vectorstore()
-        vectorstore.delete(filter={"metadata": {"doc_id": doc_id}})
+        # O filtro deve corresponder diretamente à chave doc_id nos metadados
+        filter = {"doc_id": doc_id}
+        print(f"Tentando deletar documentos com filtro: {filter}")
+        result = vectorstore.delete(filter=filter)
+        print(f"Resultado da deleção: {result}")
+        return result
