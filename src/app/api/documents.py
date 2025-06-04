@@ -11,10 +11,11 @@ from src.app.schemas.documents import (
 )
 from src.app.ingestion.splitter import DocumentProcessor
 from src.app.ingestion.convertor import converter
-from src.service.classifier import classifier
+from src.service.classifier import ClassifierModel
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ async def create_mpv(
         collection_name = f"mpv_{numero}_{ano}"
 
         md_text = converter.convert_to_markdown(file.file, file.filename)
+        classifier = ClassifierModel(db)
         subjects = classifier.classify_markdown_file(md_text)
 
         document = MPVModel(
@@ -55,6 +57,12 @@ async def create_mpv(
         
         db.add(document)
         db.flush()
+
+        # Busca os subjects pelo nome e cria a relação
+        for subject_name in subjects:
+            subject = db.query(SubjectModel).filter(SubjectModel.name == subject_name).first()
+            if subject:
+                document.subjects.append(subject)
 
         splitter = await create_document_processor(collection_name)
         processed_chunks = splitter.process_and_store_document(
@@ -98,6 +106,7 @@ async def create_document(
             raise HTTPException(status_code=404, detail=f"MPV com ID {mpv_id} não encontrada")
         
         md_text = converter.convert_to_markdown(file.file, file.filename)
+        classifier = ClassifierModel(db)
         subjects = classifier.classify_markdown_file(md_text)
         
         document = DocumentEmendaModel(
@@ -111,6 +120,13 @@ async def create_document(
         
         db.add(document)
         db.flush()
+
+        # Busca os subjects pelo nome e cria a relação
+        for subject_name in subjects:
+            subject = db.query(SubjectModel).filter(SubjectModel.name == subject_name).first()
+            if subject:
+                document.subjects.append(subject)
+
         splitter = await create_document_processor(mpv.collection_name)
         processed_chunks = splitter.process_and_store_document(
             md_text=md_text, 
@@ -143,7 +159,7 @@ async def create_document(
 @router.get("/", summary="Lista todos os documentos na coleção")
 def list_documents(db: Session = Depends(get_db_session)):
     documents = db.query(MPVModel).all()
-    return documents
+    return [MPVResponse.model_validate(document) for document in documents]
 
 @router.get("/{doc_id}", summary="Lista MPV e emendas")
 async def update_document(doc_id: int, db: Session = Depends(get_db_session)):

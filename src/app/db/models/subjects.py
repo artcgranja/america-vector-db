@@ -1,7 +1,5 @@
 from sqlalchemy import Column, String, DateTime, func, Integer, ForeignKey, Table
 from sqlalchemy.orm import relationship
-from sqlalchemy.orm import Session
-from src.app.schemas.classifier_schemas import EnergySubjectEnum
 from src.app.db.base import Base
 
 # Association table for many-to-many relationship between MPVs and subjects
