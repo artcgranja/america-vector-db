@@ -9,6 +9,8 @@ from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document as LangchainDocument
 
+from src.service.classifier import classifier
+
 class DocumentProcessor:
     """Processador de documentos para FastAPI"""
     
@@ -38,10 +40,10 @@ class DocumentProcessor:
             metadata={
                 "source": filename,
                 "doc_id": doc_id,
-                "filename": filename,
                 "document_type": document_type,
                 "parent_id": int(parent_id) if parent_id else None,
-                "hierarchy_level": 0 if parent_id is None else 1
+                "hierarchy_level": 0 if parent_id is None else 1,
+                "subjects": classifier.classify_markdown_file(markdown_text)
             }
         )
         
