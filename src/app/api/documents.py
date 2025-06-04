@@ -190,7 +190,7 @@ async def delete_document(doc_id: int, db: Session = Depends(get_db_session)):
         splitter = await create_document_processor(mpv_document.collection_name)
         
         try:
-            deleted_chunks = splitter.delete_document_from_vector_db(doc_id)
+            splitter.delete_document_from_vector_db(doc_id)
         except Exception as e:
             logger.error(f"Erro ao remover coleção '{mpv_document.collection_name}' do vector store: {str(e)}")
         
@@ -202,10 +202,9 @@ async def delete_document(doc_id: int, db: Session = Depends(get_db_session)):
         db.delete(mpv_document)
         db.commit()
         
-        chunks_count = len(deleted_chunks) if deleted_chunks else 0
         return {
             "doc_id": doc_id,
-            "message": f"MPV e emendas removidos, {chunks_count} chunks deletados, coleção '{mpv_document.collection_name}' removida"
+            "message": f"MPV e emendas removidos, coleção '{mpv_document.collection_name}' removida"
         }
         
     except HTTPException:
@@ -258,15 +257,14 @@ async def delete_emenda(
             raise HTTPException(status_code=404, detail=f"Emenda '{doc_id}' não encontrada")
         
         splitter = await create_document_processor(emenda.collection_name)
-        vector_deleted = splitter.delete_document_from_vector_db(emenda.id)
+        splitter.delete_document_from_vector_db(emenda.id)
         
         db.delete(emenda)
         db.commit()
         
-        chunks_count = len(vector_deleted) if vector_deleted else 0
         return {
             "doc_id": doc_id,
-            "message": f"Emenda removida, {chunks_count} chunks deletados"
+            "message": f"Emenda removida"
         }
         
     except HTTPException:

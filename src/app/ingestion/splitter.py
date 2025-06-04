@@ -9,6 +9,7 @@ from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document as LangchainDocument
 from src.app.core.config import settings
+from datetime import datetime
 
 class DocumentProcessor:
     """Processador de documentos para FastAPI"""
@@ -17,6 +18,7 @@ class DocumentProcessor:
         """Inicializa o processador de documentos"""
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
         self.collection_name = collection_name
+        self.vectorstore = self.get_vectorstore()
         test_vec = self.embeddings.embed_query("test")
         if len(test_vec) != 3072:
             raise ValueError(f"Expected 3072-dimension embeddings, but got {len(test_vec)}")
@@ -77,10 +79,14 @@ class DocumentProcessor:
     
     def delete_document_from_vector_db(self, doc_id: int) -> None:
         """Remove um documento do banco de dados do vector store"""
-        vectorstore = self.get_vectorstore()
-        # O filtro deve corresponder diretamente à chave doc_id nos metadados
-        filter = {"doc_id": doc_id}
-        print(f"Tentando deletar documentos com filtro: {filter}")
-        result = vectorstore.delete(filter=filter)
-        print(f"Resultado da deleção: {result}")
-        return result
+        try:
+            docs = self.vectorstore.similarity_search(query="", k=100, filter={"doc_id": doc_id})
+            ids_to_delete = [doc.id for doc in docs]
+            self.vectorstore.delete(ids=ids_to_delete)
+        except Exception as e:
+            print(f"Erro ao deletar documento {doc_id}: {e}")
+            raise
+    
+    def delete_all_documents_from_vector_db(self) -> None:
+        """Remove todos os documentos do banco de dados do vector store"""
+        return self.vectorstore.delete(filter={"metadata": {}})
