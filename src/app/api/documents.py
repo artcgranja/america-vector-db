@@ -290,3 +290,17 @@ async def delete_emenda(
         db.rollback()
         logger.error(f"Erro ao deletar emenda {doc_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro ao deletar emenda")
+    
+@router.get("/emenda/{mpv_id}/{num_emenda}", summary="Obtém uma emenda específica")
+async def get_emenda(mpv_id: int, num_emenda: int, db: Session = Depends(get_db_session)):
+    emenda = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.mpv_id == mpv_id, DocumentEmendaModel.num_emenda == num_emenda).first()
+    if not emenda:
+        raise HTTPException(status_code=404, detail=f"Emenda {num_emenda} da MPV {mpv_id} não encontrada")
+    return DocumentEmendaResponse.model_validate(emenda)
+
+@router.get("/emenda/{subject}", summary="Obtém uma emenda por assunto")
+async def get_emenda_by_subject(subject: str, db: Session = Depends(get_db_session)):
+    emendas = db.query(DocumentEmendaModel).filter(DocumentEmendaModel.subjects.any(SubjectModel.name == subject)).all()
+    if not emendas:
+        raise HTTPException(status_code=404, detail=f"Nenhuma emenda encontrada para o assunto '{subject}'")
+    return [DocumentEmendaResponse.model_validate(emenda) for emenda in emendas]
