@@ -11,7 +11,8 @@ from src.app.schemas.documents import (
 )
 from src.app.ingestion.splitter import DocumentProcessor
 from src.app.ingestion.convertor import converter
-from src.app.service.classifier import ClassifierModel
+from src.app.service.classifier.classifier import ClassifierModel
+from src.app.service.summarization.summarizer import summarize_file
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging
@@ -42,9 +43,10 @@ async def create_mpv(
     try:
         collection_name = f"mpv_{numero}_{ano}"
 
-        md_text = converter.convert_to_markdown(file.file, file.filename)
+        file_text = converter.convert_file(file.file, file.filename)
+        file_text = summarize_file(file_text)
         classifier = ClassifierModel(db)
-        subjects = classifier.classify_markdown_file(md_text)
+        subjects = classifier.classify_file(file_text)
 
         document = MPVModel(
             filename=file.filename,
@@ -66,7 +68,7 @@ async def create_mpv(
 
         splitter = await create_document_processor(collection_name)
         processed_chunks = splitter.process_and_store_document(
-            md_text=md_text, 
+            md_text=file_text, 
             doc_id=document.id, 
             filename=file.filename, 
             document_type="MPV", 
@@ -105,9 +107,9 @@ async def create_document(
         if not mpv:
             raise HTTPException(status_code=404, detail=f"MPV com ID {mpv_id} não encontrada")
         
-        md_text = converter.convert_to_markdown(file.file, file.filename)
+        file_text = converter.convert_file(file.file, file.filename)
         classifier = ClassifierModel(db)
-        subjects = classifier.classify_markdown_file(md_text)
+        subjects = classifier.classify_file(file_text)
         
         document = DocumentEmendaModel(
             filename=file.filename,
@@ -129,7 +131,7 @@ async def create_document(
 
         splitter = await create_document_processor(mpv.collection_name)
         processed_chunks = splitter.process_and_store_document(
-            md_text=md_text, 
+            md_text=file_text, 
             doc_id=document.id, 
             filename=file.filename, 
             document_type="EMENDA", 

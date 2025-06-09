@@ -6,7 +6,7 @@ from langchain_core.prompts import (
 )
 from langchain_core.output_parsers import PydanticOutputParser
 from src.app.schemas.classifier_schemas import ClassifierResponse
-from src.app.service.promt import SYSTEM_PROMPT
+from src.app.service.classifier.promt import SYSTEM_PROMPT
 from sqlalchemy.orm import Session
 from src.app.db.models.subjects import SubjectModel
 import json
@@ -31,7 +31,7 @@ class ClassifierModel:
         )
         self.chain = self.prompt | self.llm | self.parser
 
-    def classify_markdown_file(self, markdown_text: str) -> ClassifierResponse:
+    def classify_file(self, file_text: str) -> ClassifierResponse:
         """
         Processa um arquivo markdown e retorna sua classificação.
 
@@ -42,7 +42,7 @@ class ClassifierModel:
             ClassifierResponse: Resposta com a classificação do documento
         """
         try:
-            response = self.chain.invoke({"input": markdown_text})
+            response = self.chain.invoke({"input": file_text})
             return response.subjects
 
         except Exception as e:
