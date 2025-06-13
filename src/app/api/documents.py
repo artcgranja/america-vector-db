@@ -11,8 +11,8 @@ from src.app.schemas.documents import (
 )
 from src.app.ingestion.splitter import DocumentProcessor
 from src.app.ingestion.convertor import converter
-from src.app.service.classifier.classifier import ClassifierModel
-from src.app.service.summarization.summarizer import summarize_file
+from src.app.service.classifier import ClassifierModel
+from src.app.service.summaryzer import SummaryzerModel
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging
@@ -44,13 +44,15 @@ async def create_mpv(
         collection_name = f"mpv_{numero}_{ano}"
 
         file_text = converter.convert_file(file.file, file.filename)
-        file_text = summarize_file(file_text)
         classifier = ClassifierModel(db)
-        subjects = classifier.classify_file(file_text)
+        summaryzer = SummaryzerModel(db)
+        subjects = classifier.classify_markdown_file(file_text)
+        summary = summaryzer.summarize_markdown_file(file_text)
 
         document = MPVModel(
             filename=file.filename,
             collection_name=collection_name,
+            summary=summary,
             numero=numero,
             ano=ano,
             data_publicacao=data_publicacao,
@@ -109,12 +111,15 @@ async def create_document(
         
         file_text = converter.convert_file(file.file, file.filename)
         classifier = ClassifierModel(db)
-        subjects = classifier.classify_file(file_text)
+        summaryzer = SummaryzerModel(db)
+        subjects = classifier.classify_markdown_file(file_text)
+        summary = summaryzer.summarize_markdown_file(file_text, mpv.summary)
         
         document = DocumentEmendaModel(
             filename=file.filename,
             collection_name=mpv.collection_name,
             num_emenda=num_emenda,
+            summary=summary,
             apresentada_por=apresentada_por,
             data_apresentacao=data_apresentacao,
             mpv_id=mpv_id

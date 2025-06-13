@@ -9,6 +9,7 @@ class DocumentBaseModel(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
     collection_name = Column(String, nullable=False)
+    summary = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
