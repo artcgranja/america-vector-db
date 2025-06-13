@@ -11,8 +11,8 @@ from src.app.schemas.documents import (
 )
 from src.app.ingestion.splitter import DocumentProcessor
 from src.app.ingestion.convertor import converter
-from src.app.service.classifier import ClassifierModel
-from src.app.service.summaryzer import SummaryzerModel
+from src.app.service.classifier.classifier import ClassifierModel
+from src.app.service.summarization.summaryzer import SummaryzerModel
 from datetime import datetime
 from src.app.db.session import get_db_session
 import logging
@@ -190,6 +190,7 @@ async def update_document(doc_id: int, mpv_update: MPVCreate, db: Session = Depe
     mpv_document.data_publicacao = mpv_update.data_publicacao
     mpv_document.status = mpv_update.status
     mpv_document.filename = mpv_update.filename
+    mpv_document.summary = mpv_update.summary
     mpv_document.collection_name = mpv_update.collection_name
     
     try:

@@ -4,9 +4,8 @@ from langchain_core.prompts import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate
 )
-from src.app.service.promt import SUMMARY_PROMPT_SYSTEM
+from src.app.service.summarization.promt import SUMMARY_PROMPT_SYSTEM
 from sqlalchemy.orm import Session
-import json
 
 class SummaryzerModel:
     def __init__(self, db: Session, model: str = "gemini-2.0-flash-001", temperature: float = 0.1):

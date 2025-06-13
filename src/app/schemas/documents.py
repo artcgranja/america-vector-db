@@ -14,6 +14,7 @@ class DocumentBaseSchema(BaseModel):
     id: int = Field(..., description="ID do documento")
     filename: str = Field(..., description="Nome do arquivo")
     collection_name: str = Field(..., description="Nome da coleção")
+    summary: str = Field(..., description="Resumo do documento")
     subjects: List[SubjectResponse] = Field(..., description="Assuntos do documento")
     created_at: datetime = Field(..., description="Data de criação")
     updated_at: datetime = Field(..., description="Data de atualização")
