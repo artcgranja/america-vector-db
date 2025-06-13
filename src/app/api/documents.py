@@ -46,7 +46,7 @@ async def create_mpv(
         file_text = converter.convert_file(file.file, file.filename)
         classifier = ClassifierModel(db)
         summaryzer = SummaryzerModel(db)
-        subjects = classifier.classify_markdown_file(file_text)
+        subjects = classifier.classify_file(file_text)
         summary = summaryzer.summarize_markdown_file(file_text)
 
         document = MPVModel(
@@ -112,7 +112,7 @@ async def create_document(
         file_text = converter.convert_file(file.file, file.filename)
         classifier = ClassifierModel(db)
         summaryzer = SummaryzerModel(db)
-        subjects = classifier.classify_markdown_file(file_text)
+        subjects = classifier.classify_file(file_text)
         summary = summaryzer.summarize_markdown_file(file_text, mpv.summary)
         
         document = DocumentEmendaModel(
