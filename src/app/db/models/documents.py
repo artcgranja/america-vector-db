@@ -8,7 +8,11 @@ class DocumentBaseModel(Base):
     
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
+    document_type = Column(String, nullable=False)
+    document_name = Column(String, nullable=False)
     collection_name = Column(String, nullable=False)
+    presented_by = Column(String, nullable=True)
+    presented_at = Column(DateTime(timezone=True), nullable=True)
     summary = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -21,31 +25,22 @@ class DocumentBaseModel(Base):
     def __repr__(self):
         return f"<{self.__class__.__name__}(id={self.id}, filename={self.filename})>"
 
-class MPVModel(DocumentBaseModel):
-    __tablename__ = "mpvs"
-
-    numero = Column(Integer, nullable=False)
-    ano = Column(Integer, nullable=False)
-    data_publicacao = Column(DateTime(timezone=True), nullable=False)
-    status = Column(String, nullable=False)  # Em vigor, Revogada, etc.
+class PrimaryDocumentModel(DocumentBaseModel):
+    __tablename__ = "primary_documents"
     
     # Relacionamento com as emendas
-    emendas = relationship("DocumentEmendaModel", back_populates="mpv")
+    emendas = relationship("SecondaryDocumentModel", back_populates="primary")
     
     # Relacionamento com os subjects
-    subjects = relationship("SubjectModel", secondary="mpv_subjects", back_populates="mpvs")
+    subjects = relationship("SubjectModel", secondary="primary_subjects", back_populates="primary_documents")
 
-class DocumentEmendaModel(DocumentBaseModel):
-    __tablename__ = "document_emendas"
+class SecondaryDocumentModel(DocumentBaseModel):
+    __tablename__ = "secondary_documents"
 
-    num_emenda = Column(Integer, nullable=False)
-    apresentada_por = Column(String, nullable=False)
-    data_apresentacao = Column(DateTime(timezone=True), nullable=False)
-    chunks_count = Column(Integer, default=0)
-    vector_store_name = Column(String, nullable=True)
+    party_affiliation = Column(String, nullable=False)
     
-    mpv_id = Column(Integer, ForeignKey("mpvs.id"), nullable=False)
-    mpv = relationship("MPVModel", back_populates="emendas")
-    
+    primary_id = Column(Integer, ForeignKey("primary_documents.id"), nullable=False)
+    primary = relationship("PrimaryDocumentModel", back_populates="secondary_documents")
+
     # Relacionamento com os subjects
-    subjects = relationship("SubjectModel", secondary="emenda_subjects", back_populates="emendas")
+    subjects = relationship("SubjectModel", secondary="secondary_subjects", back_populates="secondary_documents")
