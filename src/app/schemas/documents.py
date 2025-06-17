@@ -23,13 +23,13 @@ class DocumentBaseSchema(BaseModel):
         from_attributes = True
 
 # MPV schemas
-class MPVResponse(DocumentBaseSchema):
+class PrimaryDocumentResponse(DocumentBaseSchema):
     numero: int = Field(..., description="Número da MPV")
     ano: int = Field(..., description="Ano da MPV")
     data_publicacao: datetime = Field(..., description="Data de publicação da MPV")
     status: str = Field(..., description="Status da MPV")
 
-class MPVCreate(BaseModel):
+class PrimaryDocumentCreate(BaseModel):
     numero: int = Field(..., description="Número da MPV")
     ano: int = Field(..., description="Ano da MPV")
     data_publicacao: datetime = Field(..., description="Data de publicação da MPV")
@@ -38,7 +38,7 @@ class MPVCreate(BaseModel):
     collection_name: str = Field(..., description="Nome da coleção")
 
 # Document Emenda schemas
-class DocumentEmendaResponse(DocumentBaseSchema):
+class SecondaryDocumentResponse(DocumentBaseSchema):
     num_emenda: int = Field(..., description="Número da emenda")
     apresentada_por: str = Field(..., description="Quem apresentou a emenda")
     data_apresentacao: datetime = Field(..., description="Data de apresentação da emenda")
@@ -46,7 +46,7 @@ class DocumentEmendaResponse(DocumentBaseSchema):
     vector_store_name: Optional[str] = Field(None, description="Nome do vector store")
     mpv_id: int = Field(..., description="ID da MPV associada")
 
-class DocumentEmendaCreate(BaseModel):
+class SecondaryDocumentCreate(BaseModel):
     num_emenda: int = Field(..., description="Número da emenda")
     apresentada_por: str = Field(..., description="Quem apresentou a emenda")
     data_apresentacao: datetime = Field(..., description="Data de apresentação da emenda")
@@ -55,25 +55,25 @@ class DocumentEmendaCreate(BaseModel):
     collection_name: str = Field(..., description="Nome da coleção")
 
 # Response schemas
-class DocumentEmendaListResponse(BaseModel):
-    mpv_id: int = Field(..., description="ID da MPV")
-    mpv: MPVResponse = Field(..., description="MPV")
-    emendas: List[DocumentEmendaResponse] = Field(..., description="Lista de documentos de emenda")
+class SecondaryDocumentListResponse(BaseModel):
+    primary_id: int = Field(..., description="ID da MPV")
+    primary: PrimaryDocumentResponse = Field(..., description="MPV")
+    secondary: List[SecondaryDocumentResponse] = Field(..., description="Lista de documentos de emenda")
 
     class Config:
         from_attributes = True
 
-class DocumentCreateResponse(BaseModel):
+class SecondaryDocumentCreateResponse(BaseModel):
     doc_id: str = Field(..., description="Identificador único do documento")
     message: str = Field(..., description="Mensagem de confirmação da operação")
 
-class DocumentListResponse(BaseModel):
+class SecondaryDocumentListResponse(BaseModel):
     documents: List[str] = Field(..., description="Lista de IDs de documentos na coleção")
 
-class DocumentChunksResponse(BaseModel):
+class SecondaryDocumentChunksResponse(BaseModel):
     doc_id: str = Field(..., description="Identificador do documento")
     chunks: List[str] = Field(..., description="Lista de conteúdo dos chunks do documento")
 
-class OperationResponse(BaseModel):
+class SecondaryDocumentOperationResponse(BaseModel):
     doc_id: str = Field(..., description="Identificador do documento")
     message: str = Field(..., description="Mensagem de confirmação da operação")

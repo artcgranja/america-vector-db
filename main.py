@@ -26,4 +26,11 @@ app.include_router(documents.router)
 app.include_router(subjects.router)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8000)
+    # Configurações específicas para Windows
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",  # Permite acesso de qualquer IP
+        port=8000,
+        reload=True,  # Ativa o reload automático durante desenvolvimento
+        workers=1  # Número de workers (1 é suficiente para desenvolvimento)
+    )

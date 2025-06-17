@@ -10,33 +10,31 @@ class DocumentBaseModel(Base):
     filename = Column(String, nullable=False)
     document_type = Column(String, nullable=False)
     document_name = Column(String, nullable=False)
-    collection_name = Column(String, nullable=False)
     presented_by = Column(String, nullable=True)
     presented_at = Column(DateTime(timezone=True), nullable=True)
     summary = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # Relationship with subjects
-    @declared_attr
-    def subjects(cls):
-        return relationship("SubjectModel", secondary="document_subjects", back_populates="documents")
-
     def __repr__(self):
         return f"<{self.__class__.__name__}(id={self.id}, filename={self.filename})>"
 
 class PrimaryDocumentModel(DocumentBaseModel):
     __tablename__ = "primary_documents"
+    __table_args__ = {'extend_existing': True}
     
-    # Relacionamento com as emendas
-    emendas = relationship("SecondaryDocumentModel", back_populates="primary")
+    collection_name = Column(String, nullable=False)
+    
+    secondary_documents = relationship("SecondaryDocumentModel", back_populates="primary")
     
     # Relacionamento com os subjects
     subjects = relationship("SubjectModel", secondary="primary_subjects", back_populates="primary_documents")
 
 class SecondaryDocumentModel(DocumentBaseModel):
     __tablename__ = "secondary_documents"
+    __table_args__ = {'extend_existing': True}
 
+    role = Column(String, nullable=True)
     party_affiliation = Column(String, nullable=False)
     
     primary_id = Column(Integer, ForeignKey("primary_documents.id"), nullable=False)

@@ -6,12 +6,12 @@ from fastapi import UploadFile
 
 class Converter:
 
-    def convert_file(self, file: UploadFile, filename: str) -> str:
+    async def convert_file(self, file: UploadFile, filename: str) -> str:
         """Processa e converte um documento para texto"""
         try:
             # Salva o arquivo temporariamente
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-                content = file.read()
+                content = await file.read()
                 temp_file.write(content)
                 temp_file.flush()
                 

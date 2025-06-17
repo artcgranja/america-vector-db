@@ -4,7 +4,7 @@ from langchain_core.runnables import RunnableConfig
 from sqlalchemy.orm import Session
 from fastapi import UploadFile
 
-from src.app.db.models.documents import MPVModel
+from src.app.db.models.documents import PrimaryDocumentModel
 from src.app.service.summarization.summaryzer import SummaryzerModel
 from src.app.service.classifier.subjects_classifier import SubjectsClassifier
 from src.app.service.classifier.theme_classifier import ThemeClassifier
@@ -117,10 +117,10 @@ class DocumentProcessingWorkflow:
     
     # ==================== NÔES DO WORKFLOW ====================
     
-    def convert_to_text_node(self, state: DocumentProcessingState) -> DocumentProcessingState:
+    async def convert_to_text_node(self, state: DocumentProcessingState) -> DocumentProcessingState:
         """Converte o arquivo para texto"""
         try:
-            state["text_content"] = converter.convert_file(state["file"], state["filename"])
+            state["text_content"] = await converter.convert_file(state["file"], state["filename"])
             return state
         except Exception as e:
             state["processing_status"] = "error"
@@ -142,8 +142,8 @@ class DocumentProcessingWorkflow:
         try:
             # Assumindo que documento principal é sempre MPV por enquanto
             # Isso pode ser generalizado futuramente
-            primary_doc = state["db_session"].query(MPVModel).filter(
-                MPVModel.id == state["primary_id"]
+            primary_doc = state["db_session"].query(PrimaryDocumentModel).filter(
+                PrimaryDocumentModel.id == state["primary_id"]
             ).first()
             
             if primary_doc:

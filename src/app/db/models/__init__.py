@@ -1,5 +1,7 @@
-from src.app.db.models.subjects import SubjectModel
-from src.app.db.models.documents import MPVModel, DocumentEmendaModel
+from src.app.db.models.subjects import SubjectModel, primary_subjects, secondary_subjects
+from src.app.db.models.documents import PrimaryDocumentModel, SecondaryDocumentModel
 
-# Garante que todos os modelos sejam importados
-__all__ = ['SubjectModel', 'MPVModel', 'DocumentEmendaModel'] 
+__all__ = [
+    'SubjectModel', 'PrimaryDocumentModel', 'SecondaryDocumentModel',
+    'primary_subjects', 'secondary_subjects'
+]

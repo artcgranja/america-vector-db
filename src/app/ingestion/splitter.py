@@ -1,8 +1,8 @@
 from typing import List
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
-from langchain.schema import Document as LangchainDocument
+from langchain_core.documents import Document as LangchainDocument
 from src.app.core.config import settings
 
 class DocumentProcessor:
