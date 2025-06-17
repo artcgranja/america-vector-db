@@ -9,6 +9,8 @@ class DocumentBaseModel(Base):
     id = Column(Integer, primary_key=True)
     filename = Column(String, nullable=False)
     document_type = Column(String, nullable=False)
+    document_number = Column(Integer, nullable=True)
+    document_year = Column(Integer, nullable=True)
     document_name = Column(String, nullable=False)
     presented_by = Column(String, nullable=True)
     presented_at = Column(DateTime(timezone=True), nullable=True)
