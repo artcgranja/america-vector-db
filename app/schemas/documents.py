@@ -13,7 +13,6 @@ class SubjectResponse(BaseModel):
 class DocumentBaseSchema(BaseModel):
     id: int = Field(..., description="ID do documento")
     filename: str = Field(..., description="Nome do arquivo")
-    collection_name: str = Field(..., description="Nome da coleção")
     summary: str = Field(..., description="Resumo do documento")
     subjects: List[SubjectResponse] = Field(..., description="Assuntos do documento")
     created_at: datetime = Field(..., description="Data de criação")
@@ -33,6 +32,7 @@ class PrimaryDocumentResponse(DocumentBaseSchema):
     document_name: str = Field(..., description="Nome da MPV")
     presented_at: datetime = Field(..., description="Data de apresentação da MPV")
     key_points: Dict[str, str] = Field(..., description="Pontos chave do documento")
+    collection_name: str = Field(..., description="Nome da coleção")
 
 class PrimaryDocumentCreate(BaseModel):
     document_number: int = Field(..., description="Número da MPV")
@@ -49,26 +49,38 @@ class PrimaryDocumentCreate(BaseModel):
 
 # Document Emenda schemas
 class SecondaryDocumentResponse(DocumentBaseSchema):
-    num_emenda: int = Field(..., description="Número da emenda")
-    apresentada_por: str = Field(..., description="Quem apresentou a emenda")
-    data_apresentacao: datetime = Field(..., description="Data de apresentação da emenda")
-    chunks_count: int = Field(..., description="Número de chunks do documento")
-    vector_store_name: Optional[str] = Field(None, description="Nome do vector store")
-    mpv_id: int = Field(..., description="ID da MPV associada")
+    role: str = Field(..., description="Papel do apresentador")
+    party_affiliation: str = Field(..., description="Afiliação partidária")
+    primary_id: int = Field(..., description="ID do documento principal associado")
+    document_number: int = Field(..., description="Número do documento")
+    document_name: str = Field(..., description="Nome do documento")
+    presented_at: datetime = Field(..., description="Data de apresentação")
+    key_points: Dict[str, str] = Field(..., description="Pontos chave do documento")
+
+    class Config:
+        from_attributes = True
 
 class SecondaryDocumentCreate(BaseModel):
-    num_emenda: int = Field(..., description="Número da emenda")
-    apresentada_por: str = Field(..., description="Quem apresentou a emenda")
-    data_apresentacao: datetime = Field(..., description="Data de apresentação da emenda")
-    mpv_id: int = Field(..., description="ID da MPV associada à emenda")
     filename: str = Field(..., description="Nome do arquivo")
-    collection_name: str = Field(..., description="Nome da coleção")
+    document_type: str = Field(..., description="Tipo do documento")
+    document_number: int = Field(..., description="Número do documento")
+    document_year: int = Field(..., description="Ano do documento")
+    document_name: str = Field(..., description="Nome do documento")
+    presented_by: str = Field(..., description="Quem apresentou o documento")
+    presented_at: datetime = Field(..., description="Data de apresentação")
+    summary: str = Field(..., description="Resumo do documento")
+    central_theme: str = Field(..., description="Tema central do documento")
+    key_points: Dict[str, str] = Field(..., description="Pontos chave do documento")
+    link: str = Field(..., description="Link para o documento")
+    role: str = Field(..., description="Papel do apresentador")
+    party_affiliation: str = Field(..., description="Afiliação partidária")
+    primary_id: int = Field(..., description="ID do documento principal associado")
 
 # Response schemas
 class SecondaryDocumentListResponse(BaseModel):
     primary_id: int = Field(..., description="ID da MPV")
     primary: PrimaryDocumentResponse = Field(..., description="MPV")
-    secondary: List[SecondaryDocumentResponse] = Field(..., description="Lista de documentos de emenda")
+    secondaries: List[SecondaryDocumentResponse] = Field(..., description="Lista de documentos de emenda")
 
     class Config:
         from_attributes = True

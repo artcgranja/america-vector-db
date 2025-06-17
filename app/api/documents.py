@@ -5,6 +5,9 @@ from app.db.models.subjects import SubjectModel
 from app.schemas.documents import (
     PrimaryDocumentResponse, 
     SecondaryDocumentListResponse,
+    SecondaryDocumentResponse,
+    SecondaryDocumentCreate,
+    SecondaryDocumentCreateResponse,
 )
 from app.ingestion.splitter import DocumentProcessor
 from app.service.workflow import document_workflow
@@ -282,21 +285,6 @@ def list_primary_documents(db: Session = Depends(get_db_session)):
         dados.append(PrimaryDocumentResponse.model_validate(doc_data))
     return dados
 
-@router.get("/{doc_id}", summary="Lista documento principal e secundários")
-async def get_document_with_secondaries(doc_id: int, db: Session = Depends(get_db_session)):
-    primary_document = db.query(PrimaryDocumentModel).filter(PrimaryDocumentModel.id == doc_id).first()
-    if not primary_document:
-        raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' não encontrado")
-    
-    secondary_documents = db.query(SecondaryDocumentModel).filter(SecondaryDocumentModel.primary_id == doc_id).all()
-    
-    primary_response = PrimaryDocumentResponse.model_validate(primary_document)
-    return SecondaryDocumentListResponse(
-        primary_id=primary_document.id, 
-        primary=primary_response, 
-        secondaries=secondary_documents
-    )
-
 @router.delete("/{doc_id}", summary="Remove documento principal e secundários")
 async def delete_document(doc_id: int, db: Session = Depends(get_db_session)):
     try:
@@ -339,3 +327,40 @@ async def delete_document(doc_id: int, db: Session = Depends(get_db_session)):
         db.rollback()
         logger.error(f"Erro ao deletar documento {doc_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro ao deletar documento")
+
+@router.get("/secondary/{primary_id}", summary="Lista documentos secundários por ID do documento principal")
+def list_secondary_documents_by_primary(primary_id: int, db: Session = Depends(get_db_session)):
+    documents = db.query(SecondaryDocumentModel).filter(SecondaryDocumentModel.primary_id == primary_id).all()
+    dados = []
+    for document in documents:
+        # Convertendo o documento para o formato do schema
+        doc_data = {
+            "id": document.id,
+            "filename": document.filename,
+            "summary": document.summary,
+            "subjects": [],  # Será preenchido se houver subjects associados
+            "created_at": document.created_at,
+            "updated_at": document.updated_at,
+            "document_type": document.document_type,
+            "document_year": document.document_year,
+            "presented_by": document.presented_by,
+            "central_theme": document.central_theme,
+            "link": document.link,
+            "document_number": document.document_number,
+            "document_name": document.document_name,
+            "presented_at": document.presented_at,
+            "key_points": document.key_points,
+            "role": document.role,
+            "party_affiliation": document.party_affiliation,
+            "primary_id": document.primary_id
+        }
+        
+        # Adicionando subjects se existirem
+        if hasattr(document, 'subjects') and document.subjects:
+            doc_data["subjects"] = [
+                {"id": subject.id, "name": subject.name}
+                for subject in document.subjects
+            ]
+        
+        dados.append(SecondaryDocumentResponse.model_validate(doc_data))
+    return dados
