@@ -142,6 +142,7 @@ async def create_secondary(
     presented_by: str = Form(...),
     presented_at: datetime = Form(...),
     primary_id: int = Form(..., description="ID do documento primário"),
+    role: str = Form(..., description="Cargo do autor"),
     party_affiliation: str = Form(..., description="Partido político do autor"),
     db: Session = Depends(get_db_session)
 ):
@@ -159,6 +160,7 @@ async def create_secondary(
             "document_name": document_name,
             "presented_by": presented_by,
             "presented_at": presented_at,
+            "role": role,
             "party_affiliation": party_affiliation,
             "primary_id": primary_id,  # Indica que é documento secundário
             "collection_name": primary.collection_name
@@ -194,13 +196,13 @@ async def create_secondary(
             filename=file.filename,
             document_type=document_type,
             document_name=document_name,
-            collection_name=primary.collection_name,
             presented_by=presented_by,
             presented_at=presented_at,
             summary=workflow_result["summary"],  # Summary contextualizado
             central_theme=workflow_result["central_theme"],
             key_points=workflow_result["key_points"],
             party_affiliation=party_affiliation,
+            role=role,
             primary_id=primary_id
         )
         

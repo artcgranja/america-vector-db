@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, func, Integer, ForeignKey
+from sqlalchemy import Column, String, DateTime, func, Integer, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship
 from src.app.db.base import Base
@@ -13,6 +13,8 @@ class DocumentBaseModel(Base):
     presented_by = Column(String, nullable=True)
     presented_at = Column(DateTime(timezone=True), nullable=True)
     summary = Column(String, nullable=True)
+    central_theme = Column(String, nullable=True)
+    key_points = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
