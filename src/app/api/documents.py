@@ -28,6 +28,8 @@ async def create_primary(
     file: UploadFile = File(...),
     document_type: str = Form(...),
     document_name: str = Form(...),
+    document_number: int = Form(...),
+    document_year: int = Form(...),
     presented_by: str = Form(...),
     presented_at: datetime = Form(...),
     db: Session = Depends(get_db_session)
@@ -37,22 +39,11 @@ async def create_primary(
     try:
         collection_name = f"{document_type}_{document_name}"
         
-        # Preparar metadados para o workflow
-        metadata = {
-            "document_type": document_type,
-            "document_name": document_name,
-            "presented_by": presented_by,
-            "presented_at": presented_at,
-            "collection_name": collection_name
-            # Sem primary_id = documento primário
-        }
-        
-        # 🚀 EXECUTAR WORKFLOW COMPLETO
         workflow_result = await document_workflow.process_document(
             file=file,
             filename=file.filename,
-            metadata=metadata,
-            db_session=db
+            db_session=db,
+            primary_id=None
         )
         
         # Verificar se o workflow foi bem-sucedido
@@ -79,6 +70,8 @@ async def create_primary(
             summary=workflow_result["summary"],
             central_theme=workflow_result["central_theme"],
             key_points=workflow_result["key_points"],
+            document_number=document_number,
+            document_year=document_year,
             document_name=document_name,
             presented_by=presented_by,
             presented_at=presented_at
@@ -141,6 +134,8 @@ async def create_secondary(
     document_name: str = Form(...),
     presented_by: str = Form(...),
     presented_at: datetime = Form(...),
+    document_number: int = Form(...),
+    document_year: int = Form(...),
     primary_id: int = Form(..., description="ID do documento primário"),
     role: str = Form(..., description="Cargo do autor"),
     party_affiliation: str = Form(..., description="Partido político do autor"),
@@ -154,24 +149,11 @@ async def create_secondary(
         if not primary:
             raise HTTPException(status_code=404, detail=f"Documento primário com ID {primary_id} não encontrado")
         
-        # Preparar metadados para o workflow
-        metadata = {
-            "document_type": document_type,
-            "document_name": document_name,
-            "presented_by": presented_by,
-            "presented_at": presented_at,
-            "role": role,
-            "party_affiliation": party_affiliation,
-            "primary_id": primary_id,  # Indica que é documento secundário
-            "collection_name": primary.collection_name
-        }
-        
-        # 🚀 EXECUTAR WORKFLOW COMPLETO
         workflow_result = await document_workflow.process_document(
             file=file,
             filename=file.filename,
-            metadata=metadata,
-            db_session=db
+            db_session=db,
+            primary_id=primary_id
         )
         
         # Verificar se o workflow foi bem-sucedido
@@ -203,13 +185,14 @@ async def create_secondary(
             key_points=workflow_result["key_points"],
             party_affiliation=party_affiliation,
             role=role,
+            document_number=document_number,
+            document_year=document_year,
             primary_id=primary_id
         )
         
         db.add(document)
         db.flush()  # Para obter o ID
         
-        # Associar subjects identificados pelo workflow
         for subject_name in workflow_result["subjects"]:
             subject = db.query(SubjectModel).filter(SubjectModel.name == subject_name).first()
             if subject:

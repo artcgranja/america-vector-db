@@ -17,7 +17,6 @@ class DocumentProcessingState(TypedDict):
     # Input inicial
     file: UploadFile
     filename: str
-    metadata: Dict[str, Any]  # Contém info do documento principal/secundário
     db_session: Session
     
     # Processamento
@@ -129,12 +128,6 @@ class DocumentProcessingWorkflow:
     
     def check_document_type_node(self, state: DocumentProcessingState) -> DocumentProcessingState:
         """Verifica se é documento principal ou secundário"""
-        if state["metadata"].get("primary_id"):
-            state["document_type"] = "secondary"
-            state["primary_id"] = state["metadata"]["primary_id"]
-        else:
-            state["document_type"] = "primary"
-            state["primary_id"] = None
         return state
     
     def get_primary_context_node(self, state: DocumentProcessingState) -> DocumentProcessingState:
@@ -276,8 +269,8 @@ class DocumentProcessingWorkflow:
         self,
         file: UploadFile,
         filename: str,
-        metadata: Dict[str, Any],
-        db_session: Session
+        db_session: Session,
+        primary_id: int = None
     ) -> DocumentProcessingState:
         """
         Processa um documento através do workflow completo
@@ -285,7 +278,7 @@ class DocumentProcessingWorkflow:
         Args:
             file: Arquivo uploaded
             filename: Nome do arquivo
-            metadata: Metadados do documento (info principal/secundário)
+            primary_id: ID do documento principal (para documentos secundários)
             db_session: Sessão do banco de dados
             
         Returns:
@@ -296,11 +289,10 @@ class DocumentProcessingWorkflow:
         initial_state: DocumentProcessingState = {
             "file": file,
             "filename": filename,
-            "metadata": metadata,
             "db_session": db_session,
             "text_content": "",
             "document_type": "",
-            "primary_id": None,
+            "primary_id": primary_id,
             "primary_context": None,
             "summary": "",
             "is_energy_related": False,
@@ -317,6 +309,11 @@ class DocumentProcessingWorkflow:
         
         # Executar workflow
         try:
+            if primary_id:
+                initial_state["document_type"] = "secondary"
+            else:
+                initial_state["document_type"] = "primary"
+
             final_state = await self.workflow.ainvoke(initial_state)
             return final_state
         except Exception as e:
