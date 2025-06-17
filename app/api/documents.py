@@ -253,37 +253,14 @@ async def create_secondary(
 @router.get("/", summary="Lista todos os documentos principais")
 def list_primary_documents(db: Session = Depends(get_db_session)):
     documents = db.query(PrimaryDocumentModel).all()
-    dados = []
-    for document in documents:
-        # Convertendo o documento para o formato do schema
-        doc_data = {
-            "id": document.id,
-            "filename": document.filename,
-            "collection_name": document.collection_name,
-            "summary": document.summary,
-            "subjects": [],  # Será preenchido se houver subjects associados
-            "created_at": document.created_at,
-            "updated_at": document.updated_at,
-            "document_type": document.document_type,
-            "document_year": document.document_year,
-            "presented_by": document.presented_by,
-            "central_theme": document.central_theme,
-            "link": document.link,
-            "document_number": document.document_number,
-            "document_name": document.document_name,
-            "presented_at": document.presented_at,
-            "key_points": document.key_points
-        }
-        
-        # Adicionando subjects se existirem
-        if hasattr(document, 'subjects') and document.subjects:
-            doc_data["subjects"] = [
-                {"id": subject.id, "name": subject.name}
-                for subject in document.subjects
-            ]
-        
-        dados.append(PrimaryDocumentResponse.model_validate(doc_data))
-    return dados
+    return [PrimaryDocumentResponse.model_validate(document) for document in documents]
+
+@router.get("/primary/{doc_id}", summary="Obtém documento primário por ID")
+def get_primary_document(doc_id: int, db: Session = Depends(get_db_session)):
+    document = db.query(PrimaryDocumentModel).filter(PrimaryDocumentModel.id == doc_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Documento primário com ID {doc_id} não encontrado")
+    return PrimaryDocumentResponse.model_validate(document)
 
 @router.delete("/{doc_id}", summary="Remove documento principal e secundários")
 async def delete_document(doc_id: int, db: Session = Depends(get_db_session)):
@@ -331,36 +308,4 @@ async def delete_document(doc_id: int, db: Session = Depends(get_db_session)):
 @router.get("/secondary/{primary_id}", summary="Lista documentos secundários por ID do documento principal")
 def list_secondary_documents_by_primary(primary_id: int, db: Session = Depends(get_db_session)):
     documents = db.query(SecondaryDocumentModel).filter(SecondaryDocumentModel.primary_id == primary_id).all()
-    dados = []
-    for document in documents:
-        # Convertendo o documento para o formato do schema
-        doc_data = {
-            "id": document.id,
-            "filename": document.filename,
-            "summary": document.summary,
-            "subjects": [],  # Será preenchido se houver subjects associados
-            "created_at": document.created_at,
-            "updated_at": document.updated_at,
-            "document_type": document.document_type,
-            "document_year": document.document_year,
-            "presented_by": document.presented_by,
-            "central_theme": document.central_theme,
-            "link": document.link,
-            "document_number": document.document_number,
-            "document_name": document.document_name,
-            "presented_at": document.presented_at,
-            "key_points": document.key_points,
-            "role": document.role,
-            "party_affiliation": document.party_affiliation,
-            "primary_id": document.primary_id
-        }
-        
-        # Adicionando subjects se existirem
-        if hasattr(document, 'subjects') and document.subjects:
-            doc_data["subjects"] = [
-                {"id": subject.id, "name": subject.name}
-                for subject in document.subjects
-            ]
-        
-        dados.append(SecondaryDocumentResponse.model_validate(doc_data))
-    return dados
+    return [SecondaryDocumentResponse.model_validate(document) for document in documents]
