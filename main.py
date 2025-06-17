@@ -2,8 +2,8 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.app.api import documents
-from src.app.api import subjects
+from app.api import documents
+from app.api import subjects
 
 app = FastAPI(
     title="Vector Service",
