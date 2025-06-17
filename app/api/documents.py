@@ -250,7 +250,37 @@ async def create_secondary(
 @router.get("/", summary="Lista todos os documentos principais")
 def list_primary_documents(db: Session = Depends(get_db_session)):
     documents = db.query(PrimaryDocumentModel).all()
-    return documents
+    dados = []
+    for document in documents:
+        # Convertendo o documento para o formato do schema
+        doc_data = {
+            "id": document.id,
+            "filename": document.filename,
+            "collection_name": document.collection_name,
+            "summary": document.summary,
+            "subjects": [],  # Será preenchido se houver subjects associados
+            "created_at": document.created_at,
+            "updated_at": document.updated_at,
+            "document_type": document.document_type,
+            "document_year": document.document_year,
+            "presented_by": document.presented_by,
+            "central_theme": document.central_theme,
+            "link": document.link,
+            "document_number": document.document_number,
+            "document_name": document.document_name,
+            "presented_at": document.presented_at,
+            "key_points": document.key_points
+        }
+        
+        # Adicionando subjects se existirem
+        if hasattr(document, 'subjects') and document.subjects:
+            doc_data["subjects"] = [
+                {"id": subject.id, "name": subject.name}
+                for subject in document.subjects
+            ]
+        
+        dados.append(PrimaryDocumentResponse.model_validate(doc_data))
+    return dados
 
 @router.get("/{doc_id}", summary="Lista documento principal e secundários")
 async def get_document_with_secondaries(doc_id: int, db: Session = Depends(get_db_session)):

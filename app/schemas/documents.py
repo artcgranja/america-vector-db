@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -18,24 +18,34 @@ class DocumentBaseSchema(BaseModel):
     subjects: List[SubjectResponse] = Field(..., description="Assuntos do documento")
     created_at: datetime = Field(..., description="Data de criação")
     updated_at: datetime = Field(..., description="Data de atualização")
+    document_type: str = Field(..., description="Tipo do documento")
+    document_year: int = Field(..., description="Ano do documento")
+    presented_by: str = Field(..., description="Quem apresentou o documento")
+    central_theme: str = Field(..., description="Tema central do documento")
+    link: str = Field(..., description="Link para o documento")
 
     class Config:
         from_attributes = True
 
 # MPV schemas
 class PrimaryDocumentResponse(DocumentBaseSchema):
-    numero: int = Field(..., description="Número da MPV")
-    ano: int = Field(..., description="Ano da MPV")
-    data_publicacao: datetime = Field(..., description="Data de publicação da MPV")
-    status: str = Field(..., description="Status da MPV")
+    document_number: int = Field(..., description="Número da MPV")
+    document_name: str = Field(..., description="Nome da MPV")
+    presented_at: datetime = Field(..., description="Data de apresentação da MPV")
+    key_points: Dict[str, str] = Field(..., description="Pontos chave do documento")
 
 class PrimaryDocumentCreate(BaseModel):
-    numero: int = Field(..., description="Número da MPV")
-    ano: int = Field(..., description="Ano da MPV")
-    data_publicacao: datetime = Field(..., description="Data de publicação da MPV")
-    status: str = Field(..., description="Status da MPV")
+    document_number: int = Field(..., description="Número da MPV")
+    document_year: int = Field(..., description="Ano da MPV")
+    presented_at: datetime = Field(..., description="Data de apresentação da MPV")
+    document_type: str = Field(..., description="Tipo do documento")
+    presented_by: str = Field(..., description="Quem apresentou o documento")
     filename: str = Field(..., description="Nome do arquivo")
     collection_name: str = Field(..., description="Nome da coleção")
+    summary: str = Field(..., description="Resumo do documento")
+    central_theme: str = Field(..., description="Tema central do documento")
+    link: str = Field(..., description="Link para o documento")
+    key_points: Dict[str, str] = Field(..., description="Pontos chave do documento")
 
 # Document Emenda schemas
 class SecondaryDocumentResponse(DocumentBaseSchema):
