@@ -91,7 +91,7 @@ async def create_primary(
         # Processar e armazenar chunks no vector store
         splitter = await create_document_processor(collection_name)
         processed_chunks = splitter.process_and_store_document(
-            md_text=workflow_result["text_content"], 
+            md_text=workflow_result["summary"], 
             doc_id=document.id, 
             filename=file.filename, 
             document_type=document_type,
@@ -205,7 +205,7 @@ async def create_secondary(
         # Processar e armazenar chunks no vector store
         splitter = await create_document_processor(primary.collection_name)
         processed_chunks = splitter.process_and_store_document(
-            md_text=workflow_result["text_content"], 
+            md_text=workflow_result["summary"], 
             doc_id=document.id, 
             filename=file.filename, 
             document_type=document_type,
@@ -250,7 +250,7 @@ async def create_secondary(
 @router.get("/", summary="Lista todos os documentos principais")
 def list_primary_documents(db: Session = Depends(get_db_session)):
     documents = db.query(PrimaryDocumentModel).all()
-    return [PrimaryDocumentResponse.model_validate(document) for document in documents]
+    return documents
 
 @router.get("/{doc_id}", summary="Lista documento principal e secundários")
 async def get_document_with_secondaries(doc_id: int, db: Session = Depends(get_db_session)):

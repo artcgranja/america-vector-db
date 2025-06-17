@@ -1,5 +1,5 @@
-from src.app.db.models import SubjectModel
-from src.app.db.session import get_db_session
+from app.db.models import SubjectModel
+from app.db.session import get_db_session
 
 # Temas do mercado de energia brasileiro
 SUBJECTS = [
