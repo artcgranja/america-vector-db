@@ -32,6 +32,7 @@ async def create_primary(
     document_year: int = Form(...),
     presented_by: str = Form(...),
     presented_at: datetime = Form(...),
+    link: str = Form(..., description="Link do documento"),
     db: Session = Depends(get_db_session)
 ):
     logger.info(f"Iniciando processamento do documento primário {document_name}")
@@ -74,7 +75,8 @@ async def create_primary(
             document_year=document_year,
             document_name=document_name,
             presented_by=presented_by,
-            presented_at=presented_at
+            presented_at=presented_at,
+            link=link
         )
         
         db.add(document)
@@ -139,6 +141,7 @@ async def create_secondary(
     primary_id: int = Form(..., description="ID do documento primário"),
     role: str = Form(..., description="Cargo do autor"),
     party_affiliation: str = Form(..., description="Partido político do autor"),
+    link: str = Form(..., description="Link do documento"),
     db: Session = Depends(get_db_session)
 ):
     logger.info(f"Iniciando processamento do documento secundário {document_name}")
@@ -187,7 +190,8 @@ async def create_secondary(
             role=role,
             document_number=document_number,
             document_year=document_year,
-            primary_id=primary_id
+            primary_id=primary_id,
+            link=link
         )
         
         db.add(document)

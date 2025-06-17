@@ -17,6 +17,7 @@ class DocumentBaseModel(Base):
     summary = Column(String, nullable=True)
     central_theme = Column(String, nullable=True)
     key_points = Column(JSON, nullable=True)
+    link = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
